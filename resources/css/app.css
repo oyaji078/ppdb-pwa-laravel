@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+/*
+ * Design tokens. Primary is the school blue used across public site, applicant
+ * portal and admin panel so the three surfaces read as one system.
+ */
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --color-brand-50: oklch(0.97 0.014 254.6);
+    --color-brand-100: oklch(0.93 0.032 255.6);
+    --color-brand-200: oklch(0.88 0.059 254.1);
+    --color-brand-300: oklch(0.81 0.096 251.8);
+    --color-brand-400: oklch(0.71 0.143 254.6);
+    --color-brand-500: oklch(0.62 0.184 259.8);
+    --color-brand-600: oklch(0.55 0.208 262.9);
+    --color-brand-700: oklch(0.49 0.198 264.1);
+    --color-brand-800: oklch(0.42 0.163 265.6);
+    --color-brand-900: oklch(0.38 0.128 265.5);
+    --color-brand-950: oklch(0.28 0.086 267.9);
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+    }
+
+    /* Visible focus for every interactive element, including keyboard-only use. */
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+        @apply outline-2 outline-offset-2 outline-brand-600;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+/*
+ * Declared as a utility (not a component class) so the variants below can
+ * compose it with @apply — Tailwind v4 only allows that for real utilities.
+ */
+@utility btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
+           transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@layer components {
+    .btn-primary {
+        @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    }
+
+    .btn-secondary {
+        @apply btn bg-white text-slate-700 ring-1 ring-slate-300 ring-inset hover:bg-slate-50;
+    }
+
+    .btn-danger {
+        @apply btn bg-rose-600 text-white hover:bg-rose-700;
+    }
+
+    .btn-ghost {
+        @apply btn text-slate-600 hover:bg-slate-100;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+
+    .card {
+        @apply rounded-xl bg-white shadow-sm ring-1 ring-slate-200/70;
+    }
+
+    .form-label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+
+    .form-input {
+        @apply block w-full rounded-lg border-0 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm
+               ring-1 ring-slate-300 ring-inset placeholder:text-slate-400
+               focus:ring-2 focus:ring-brand-600 focus:ring-inset
+               disabled:bg-slate-100 disabled:text-slate-500;
+    }
+
+    .form-error {
+        @apply mt-1.5 flex items-start gap-1 text-xs font-medium text-rose-600;
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset;
+    }
+
+    .table-wrapper {
+        @apply -mx-4 overflow-x-auto sm:mx-0;
+    }
+
+    .data-table {
+        @apply min-w-full divide-y divide-slate-200 text-sm;
+    }
+
+    .data-table thead th {
+        @apply bg-slate-50 px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase whitespace-nowrap;
+    }
+
+    .data-table tbody td {
+        @apply px-4 py-3 align-middle text-slate-700;
+    }
+
+    .data-table tbody tr {
+        @apply border-b border-slate-100 last:border-0 hover:bg-slate-50/70;
+    }
+
+    .prose-content {
+        @apply text-sm leading-relaxed text-slate-600;
+    }
+
+    .prose-content p {
+        @apply mb-3 last:mb-0;
+    }
+}
+
+/* Print: receipts and reports opened straight from the browser. */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
