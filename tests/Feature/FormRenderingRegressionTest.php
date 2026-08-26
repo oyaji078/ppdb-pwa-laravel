@@ -105,6 +105,31 @@ class FormRenderingRegressionTest extends TestCase
     }
 
     /**
+     * Typing an unseen password on a phone keyboard is where sign-ups get
+     * abandoned, so every password field carries a reveal toggle.
+     */
+    public function test_password_fields_offer_a_reveal_toggle(): void
+    {
+        $this->createPpdbConfiguration();
+
+        foreach ([route('registration.start'), route('login')] as $url) {
+            $html = $this->get($url)->assertOk()->getContent();
+
+            $this->assertStringContainsString('Tampilkan kata sandi', $html);
+            $this->assertStringContainsString('data-lucide="eye"', $html);
+            $this->assertStringContainsString('data-lucide="eye-off"', $html);
+        }
+
+        // The markup stays type="password", so with scripting off the field is
+        // masked rather than exposed.
+        $this->assertInputHas(
+            $this->get(route('login'))->getContent(),
+            'password',
+            'type="password"'
+        );
+    }
+
+    /**
      * Inputs are rendered with one attribute per line, so the tag is collapsed
      * before being searched.
      */

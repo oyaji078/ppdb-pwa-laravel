@@ -201,6 +201,51 @@
                 berlaku sama saat dijalankan lokal maupun setelah hosting.
             </p>
 
+            {{-- Filling this in is the step schools get stuck on, so the common
+                 providers are written out rather than left to be looked up. --}}
+            <details class="mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200 ring-inset">
+                <summary class="cursor-pointer text-sm font-semibold text-slate-900">
+                    Bingung diisi apa? Lihat panduan per penyedia email
+                </summary>
+
+                <div class="mt-4 overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-slate-500">
+                            <tr>
+                                <th class="py-1.5 pr-3 font-semibold">Penyedia</th>
+                                <th class="py-1.5 pr-3 font-semibold">Host SMTP</th>
+                                <th class="py-1.5 pr-3 font-semibold">Port</th>
+                                <th class="py-1.5 pr-3 font-semibold">Enkripsi</th>
+                                <th class="py-1.5 font-semibold">Username &amp; Kata Sandi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-700">
+                            @foreach ([
+                                ['Gmail / Google Workspace', 'smtp.gmail.com', '587', 'TLS', 'Username: alamat Gmail lengkap. Kata sandi: App Password 16 huruf, bukan sandi akun.'],
+                                ['Outlook / Hotmail', 'smtp-mail.outlook.com', '587', 'TLS', 'Username: alamat email lengkap.'],
+                                ['Yahoo Mail', 'smtp.mail.yahoo.com', '587', 'TLS', 'Username: alamat email lengkap. Perlu App Password.'],
+                                ['Hosting cPanel sekolah', 'mail.namasekolah.sch.id', '465', 'SSL', 'Username: alamat email lengkap yang dibuat di cPanel.'],
+                            ] as [$provider, $host, $port, $enc, $note])
+                                <tr class="border-t border-slate-200">
+                                    <td class="py-2 pr-3 font-medium">{{ $provider }}</td>
+                                    <td class="py-2 pr-3 font-mono">{{ $host }}</td>
+                                    <td class="py-2 pr-3 font-mono">{{ $port }}</td>
+                                    <td class="py-2 pr-3">{{ $enc }}</td>
+                                    <td class="py-2">{{ $note }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="mt-4 text-xs text-slate-600">
+                    <strong>Cara membuat App Password Gmail:</strong> buka
+                    <span class="font-mono">myaccount.google.com</span> &rarr; Keamanan &rarr; nyalakan
+                    Verifikasi 2 Langkah &rarr; App passwords &rarr; buat baru. Google memberi 16 huruf
+                    seperti <span class="font-mono">abcd efgh ijkl mnop</span>; salin tanpa spasi.
+                </p>
+            </details>
+
             <div class="mt-5 space-y-5">
                 <x-form.checkbox name="mail_enabled" label="Aktifkan pengiriman email"
                                  :checked="$values['mail_enabled'] === '1'"
@@ -214,35 +259,57 @@
                     <x-form.select name="mail_mailer" label="Metode Pengiriman" required
                                    :value="$values['mail_mailer'] ?: 'smtp'"
                                    :options="['smtp' => 'SMTP (server email sungguhan)', 'log' => 'Log (uji coba, email ditulis ke berkas log)']"
-                                   :placeholder="null" />
+                                   :placeholder="null"
+                                   hint="Pilih Log bila hanya ingin mencoba tanpa server email." />
 
                     <x-form.select name="mail_encryption" label="Enkripsi"
                                    :value="$values['mail_encryption'] ?: 'tls'"
                                    :options="['tls' => 'TLS (umumnya port 587)', 'ssl' => 'SSL (umumnya port 465)', 'none' => 'Tanpa enkripsi']"
-                                   :placeholder="null" />
+                                   :placeholder="null"
+                                   hint="Harus cocok dengan port di sebelah." />
 
                     <x-form.input name="mail_host" label="Host SMTP" :value="$values['mail_host']"
                                   placeholder="smtp.gmail.com" autocomplete="off"
                                   hint="Nama server, bukan alamat email. Gmail: smtp.gmail.com" />
 
                     <x-form.input name="mail_port" type="number" label="Port" :value="$values['mail_port'] ?: '587'"
-                                  min="1" max="65535" />
+                                  min="1" max="65535" inputmode="numeric"
+                                  hint="587 untuk TLS, 465 untuk SSL." />
 
                     <x-form.input name="mail_username" label="Username" :value="$values['mail_username']"
-                                  autocomplete="off" placeholder="akun@sekolah.sch.id" />
+                                  autocomplete="off" placeholder="nama@gmail.com"
+                                  hint="Umumnya alamat email lengkap, bukan nama pengguna saja." />
 
-                    <x-form.input name="mail_password" type="password" label="Kata Sandi SMTP"
-                                  autocomplete="new-password"
-                                  :hint="$hasMailPassword
-                                      ? 'Sudah tersimpan. Kosongkan bila tidak ingin mengubah.'
-                                      : 'Belum ada kata sandi tersimpan.'" />
+                    {{-- A stored password is never rendered back, so the empty box
+                         has to say plainly that one is on file — otherwise it
+                         reads as "my password vanished". --}}
+                    <div>
+                        <x-form.input name="mail_password" type="password" label="Kata Sandi SMTP"
+                                      autocomplete="new-password"
+                                      :placeholder="$hasMailPassword ? '•••••••• (tersimpan)' : 'Belum diisi'"
+                                      hint="Untuk Gmail: App Password 16 huruf, bukan kata sandi akun." />
+
+                        @if ($hasMailPassword)
+                            <p class="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200 ring-inset">
+                                <x-icon name="circle-check" class="h-3.5 w-3.5" />
+                                Kata sandi tersimpan &mdash; kosongkan bila tidak ingin mengubah
+                            </p>
+                        @else
+                            <p class="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200 ring-inset">
+                                <x-icon name="triangle-alert" class="h-3.5 w-3.5" />
+                                Belum ada kata sandi tersimpan
+                            </p>
+                        @endif
+                    </div>
 
                     <x-form.input name="mail_from_address" type="email" label="Email Pengirim"
                                   :value="$values['mail_from_address']"
-                                  hint="Kosongkan untuk memakai email sekolah." />
+                                  placeholder="Kosongkan untuk memakai email sekolah"
+                                  hint="Untuk Gmail, isi sama dengan Username agar tidak ditolak." />
 
                     <x-form.input name="mail_from_name" label="Nama Pengirim" :value="$values['mail_from_name']"
-                                  hint="Kosongkan untuk memakai nama sekolah." />
+                                  placeholder="Kosongkan untuk memakai nama sekolah"
+                                  hint="Nama yang terlihat oleh penerima." />
                 </div>
             </div>
         </section>

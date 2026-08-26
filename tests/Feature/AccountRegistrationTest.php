@@ -214,6 +214,45 @@ class AccountRegistrationTest extends TestCase
         $this->assertSame('RahasiaSmtp', app(MailConfigurator::class)->password());
     }
 
+    /**
+     * A stored password is never rendered back into the form, so the empty box
+     * has to say plainly that one is on file — otherwise it reads as "my
+     * password disappeared" and gets retyped on every save.
+     */
+    public function test_the_settings_screen_says_whether_a_password_is_stored(): void
+    {
+        $admin = $this->createAdmin(UserRole::SuperAdmin);
+
+        $this->actingAs($admin)
+            ->get(route('admin.settings.edit'))
+            ->assertOk()
+            ->assertSee('Belum ada kata sandi tersimpan');
+
+        $this->actingAs($admin)->put(route('admin.settings.update'), [
+            'school_name' => 'SMA Uji',
+            'admission_name' => 'PPDB',
+            'mail_mailer' => 'smtp',
+            'mail_password' => 'RahasiaSmtp',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.settings.edit'))
+            ->assertOk()
+            ->assertSee('Kata sandi tersimpan')
+            ->assertDontSee('RahasiaSmtp');
+    }
+
+    public function test_the_settings_screen_explains_what_to_fill_in(): void
+    {
+        $this->actingAs($this->createAdmin(UserRole::SuperAdmin))
+            ->get(route('admin.settings.edit'))
+            ->assertOk()
+            ->assertSee('Bingung diisi apa')
+            ->assertSee('smtp.gmail.com')
+            ->assertSee('App Password')
+            ->assertSee('smtp-mail.outlook.com');
+    }
+
     public function test_leaving_the_smtp_password_blank_keeps_the_stored_one(): void
     {
         $admin = $this->createAdmin(UserRole::SuperAdmin);
