@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\DocumentService;
 use App\Services\RegistrationService;
 use App\Support\SettingsRepository;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -21,6 +22,12 @@ use Illuminate\Support\Facades\Storage;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Access code every registration built by createSubmittableDraft() is given,
+     * so tests can log in through the real form.
+     */
+    public const ACCESS_CODE = 'KodeUji#123';
+
     /**
      * Counts createPpdbConfiguration() calls within a single test so repeated
      * calls produce distinct academic years.
@@ -33,6 +40,22 @@ abstract class TestCase extends BaseTestCase
 
         // Settings are cached forever; a stale cache would leak between tests.
         app(SettingsRepository::class)->flush();
+    }
+
+    /**
+     * Start a clean session whenever the acting user changes.
+     *
+     * AuthenticateSession keeps the signed-in password hash in the session so a
+     * password change signs that account out everywhere. A test that swaps roles
+     * mid-run would otherwise carry the previous user's hash into the next
+     * request and be signed straight back out. A real browser never does this —
+     * switching users there means signing out first, which clears the session.
+     */
+    public function actingAs(Authenticatable $user, $guard = null): static
+    {
+        $this->flushSession();
+
+        return parent::actingAs($user, $guard);
     }
 
     /**
@@ -145,11 +168,26 @@ abstract class TestCase extends BaseTestCase
         static $sequence = 0;
         $sequence++;
 
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $nisn = str_pad((string) (1000000000 + $sequence), 10, '0', STR_PAD_LEFT);
+        $email = 'calon'.$sequence.'@example.test';
+
+        // Mirrors the real flow: the account (user, number, password) exists
+        // before any of the form is filled in.
+        $registration = app(RegistrationService::class)->registerAccount(
+            $config['year'],
+            $config['wave'],
+            $config['track'],
+            [
+                'full_name' => 'Calon Siswa '.$sequence,
+                'nisn' => $nisn,
+                'phone' => '081234567890',
+                'email' => $email,
+            ],
+            self::ACCESS_CODE,
+        );
 
         $registration->applicant->update(array_merge([
-            'nisn' => str_pad((string) (1000000000 + $sequence), 10, '0', STR_PAD_LEFT),
+            'nisn' => $nisn,
             'nik' => str_pad((string) (5203000000000000 + $sequence), 16, '0', STR_PAD_LEFT),
             'full_name' => 'Calon Siswa '.$sequence,
             'gender' => 'L',
@@ -157,7 +195,10 @@ abstract class TestCase extends BaseTestCase
             'birth_date' => '2010-05-17',
             'religion' => 'Islam',
             'phone' => '081234567890',
+            'email' => $email,
         ], $applicantOverrides));
+
+        $registration->applicant->markEmailAsVerified();
 
         $registration->applicant->address()->create([
             'province' => 'Nusa Tenggara Barat',
@@ -203,14 +244,43 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Authenticate as an applicant without going through the status form.
+     * An empty applicant account: the registration number and access code exist,
+     * but none of the form has been filled in yet. This is the state a real
+     * applicant is in immediately after signing up.
+     *
+     * @param  array<string, mixed>  $config  Result of createPpdbConfiguration()
+     */
+    protected function createAccountFor(array $config, array $identityOverrides = []): Registration
+    {
+        static $sequence = 0;
+        $sequence++;
+
+        return app(RegistrationService::class)->registerAccount(
+            $config['year'],
+            $config['wave'],
+            $config['track'],
+            array_merge([
+                'full_name' => 'Akun Baru '.$sequence,
+                'nisn' => str_pad((string) (2000000000 + $sequence), 10, '0', STR_PAD_LEFT),
+                'phone' => '081200000000',
+                'email' => 'akun'.$sequence.'@example.test',
+            ], $identityOverrides),
+            self::ACCESS_CODE,
+        );
+    }
+
+    /**
+     * Authenticate as the applicant who owns this registration, without walking
+     * the login form. Applicants are ordinary users now, so this is the same
+     * actingAs() every other role uses.
      */
     protected function actingAsApplicant(Registration $registration): static
     {
-        $this->withSession([
-            config('ppdb.applicant_session.key') => $registration->id,
-            config('ppdb.applicant_session.token_key') => $registration->session_version,
-        ]);
+        $user = $registration->user ?? $registration->fresh()->user;
+
+        if ($user !== null) {
+            $this->actingAs($user);
+        }
 
         return $this;
     }

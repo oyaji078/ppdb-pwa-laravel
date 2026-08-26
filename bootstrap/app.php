@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\EnsureApplicantAuthenticated;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SecurityHeaders;
@@ -9,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\AuthenticateSession;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,17 +18,27 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            // Keeps the signed-in password hash in the session, so changing a
+            // password (an applicant reset, a staff password change) signs that
+            // account out everywhere else.
+            AuthenticateSession::class,
             SecurityHeaders::class,
         ]);
 
         $middleware->alias([
-            'applicant' => EnsureApplicantAuthenticated::class,
             'role' => EnsureUserHasRole::class,
             'active' => EnsureUserIsActive::class,
             'no-store' => SetNoStoreHeaders::class,
         ]);
 
-        $middleware->redirectGuestsTo(fn () => route('admin.login'));
+        // Everyone — applicant or staff — signs in at the same place.
+        $middleware->redirectGuestsTo(fn () => route('login'));
+
+        // Someone already signed in who asks for the sign-in page is sent to
+        // their own home rather than Laravel's "/dashboard" default, which does
+        // not exist here. Without this an applicant who is still signed in is
+        // silently bounced off the login form and cannot tell why.
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->homeUrl() ?? '/');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

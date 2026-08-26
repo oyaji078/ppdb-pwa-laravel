@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,6 +47,21 @@ class AppServiceProvider extends ServiceProvider
     {
         [$statusAttempts, $statusMinutes] = $this->parseLimit(config('ppdb.rate_limit.status_check'));
         [$loginAttempts, $loginMinutes] = $this->parseLimit(config('ppdb.rate_limit.admin_login'));
+
+        // One sign-in serves everyone, so the stricter of the two configured
+        // limits applies to it.
+        //
+        // Keyed by account *and* IP rather than IP alone: a school sits behind
+        // one public address, so an IP-only key would let one person's mistyped
+        // password lock out every other applicant and the whole committee. The
+        // per-IP ceiling is kept as a second, looser limit so the endpoint is
+        // still not an open door for credential stuffing.
+        RateLimiter::for('login', fn (Request $request) => [
+            Limit::perMinutes(max($statusMinutes, $loginMinutes), min($statusAttempts, $loginAttempts))
+                ->by('login:'.Str::lower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinutes(max($statusMinutes, $loginMinutes), min($statusAttempts, $loginAttempts) * 6)
+                ->by('login-ip:'.$request->ip()),
+        ]);
 
         RateLimiter::for('status-check', fn (Request $request) => Limit::perMinutes($statusMinutes, $statusAttempts)
             ->by($request->ip()));

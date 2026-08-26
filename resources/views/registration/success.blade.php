@@ -23,21 +23,6 @@
                     </p>
                 </div>
 
-                @if ($accessCode)
-                    <div class="rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-5 text-center">
-                        <p class="text-xs font-semibold tracking-wide text-amber-800 uppercase">Kode Akses</p>
-                        <p class="mt-1.5 font-mono text-3xl font-bold tracking-widest text-amber-900 sm:text-4xl">
-                            {{ $accessCode }}
-                        </p>
-                        <p class="mt-2 text-xs font-medium text-amber-800">Hanya ditampilkan satu kali</p>
-                    </div>
-                @else
-                    <x-alert type="info">
-                        Kode akses sudah ditampilkan sebelumnya dan tidak dapat ditampilkan ulang.
-                        Bila Anda kehilangan kode akses, hubungi panitia untuk penerbitan ulang.
-                    </x-alert>
-                @endif
-
                 <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-4">
                     <span class="text-sm text-slate-600">Status Pendaftaran</span>
                     <x-badge :class="$registration->registration_status->badge()">
@@ -45,9 +30,10 @@
                     </x-badge>
                 </div>
 
-                <x-alert type="warning" title="Simpan kode akses dan bukti pendaftaran">
-                    Kode akses diperlukan untuk mengecek status pendaftaran Anda.
-                    Panitia tidak menyimpan kode akses dalam bentuk yang dapat dibaca, sehingga kode yang hilang harus diterbitkan ulang.
+                <x-alert type="info" title="Cara masuk kembali">
+                    Gunakan <strong>nomor pendaftaran</strong> di atas dan <strong>kode akses</strong> yang
+                    Anda buat sendiri saat mendaftar. Demi keamanan, kode akses tidak dicetak pada bukti
+                    pendaftaran. Bila lupa, hubungi panitia untuk penerbitan ulang.
                 </x-alert>
 
                 <div class="grid gap-3 sm:grid-cols-2">

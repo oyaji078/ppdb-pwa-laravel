@@ -19,7 +19,7 @@ class PwaPublicRouteTest extends TestCase
             'home', 'profile', 'programs', 'facilities', 'contact',
             'news.index', 'gallery.index', 'announcements.index', 'downloads.index',
             'ppdb.index', 'ppdb.schedule', 'ppdb.requirements',
-            'status.form', 'pwa.offline',
+            'login', 'pwa.offline',
         ];
 
         foreach ($routes as $name) {

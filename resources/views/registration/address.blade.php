@@ -12,21 +12,27 @@
         <p class="mt-1 text-sm text-slate-600">Isi alamat tempat tinggal calon peserta didik saat ini.</p>
 
         <div class="mt-6 grid gap-5 sm:grid-cols-2">
+            {{-- autocomplete lets the browser fill a saved address in one tap. --}}
             <x-form.input name="province" label="Provinsi" :value="$address?->province" required
-                          placeholder="Nusa Tenggara Barat" />
+                          autocomplete="address-level1" placeholder="Nusa Tenggara Barat" />
 
             <x-form.input name="regency" label="Kabupaten/Kota" :value="$address?->regency" required
-                          placeholder="Lombok Timur" />
+                          autocomplete="address-level2" placeholder="Lombok Timur" />
 
-            <x-form.input name="district" label="Kecamatan" :value="$address?->district" required />
+            <x-form.input name="district" label="Kecamatan" :value="$address?->district" required
+                          autocomplete="address-level3" />
 
-            <x-form.input name="village" label="Desa/Kelurahan" :value="$address?->village" required />
+            <x-form.input name="village" label="Desa/Kelurahan" :value="$address?->village" required
+                          autocomplete="address-level4" />
 
+            {{-- 4..10 digits, matching the digits_between rule on the request. --}}
             <x-form.input name="postal_code" label="Kode Pos" :value="$address?->postal_code"
-                          inputmode="numeric" maxlength="10" />
+                          inputmode="numeric" pattern="[0-9]{4,10}" maxlength="10"
+                          autocomplete="postal-code" placeholder="83651" />
 
             <div class="sm:col-span-2">
                 <x-form.textarea name="address" label="Alamat Lengkap" :value="$address?->address" required rows="3"
+                                 autocomplete="street-address"
                                  placeholder="Nama jalan, dusun, RT/RW, nomor rumah"
                                  hint="Contoh: Jl. Pendidikan No. 12, Dusun Peneda, RT 003 / RW 001" />
             </div>

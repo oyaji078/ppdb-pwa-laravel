@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Registration;
 
 use App\Models\Program;
-use App\Support\RegistrationDraft;
+use App\Support\ApplicantSession;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -31,7 +31,7 @@ class ProgramSelectionRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                $draft = app(RegistrationDraft::class)->current();
+                $draft = app(ApplicantSession::class)->registration();
 
                 if ($draft === null) {
                     return;

@@ -7,7 +7,6 @@ use App\Enums\RegistrationStatus;
 use App\Enums\ReregistrationStatus;
 use App\Enums\SelectionStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,10 +17,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'applicant_id', 'academic_year_id', 'registration_wave_id', 'admission_track_id',
+    'applicant_id', 'user_id', 'academic_year_id', 'registration_wave_id', 'admission_track_id',
     'program_id', 'registration_status', 'current_step', 'statement_agreed',
 ])]
-#[Hidden(['access_code_hash'])]
 class Registration extends Model
 {
     use HasFactory, SoftDeletes;
@@ -48,6 +46,17 @@ class Registration extends Model
     public function applicant(): BelongsTo
     {
         return $this->belongsTo(Applicant::class);
+    }
+
+    /**
+     * The account this applicant signs in with. Applicants are ordinary users
+     * with the applicant role, so one login can own registrations across years.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /** @return BelongsTo<AcademicYear, $this> */

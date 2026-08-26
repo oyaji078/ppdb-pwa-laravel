@@ -10,6 +10,10 @@
     <div class="mx-auto max-w-4xl space-y-6 px-4 pb-4 sm:px-6 lg:px-8">
         <x-wizard-steps :current="$stepKey" :registration="$registration ?? null" />
 
+        @isset($registration)
+            <x-registration-identity-bar :registration="$registration" />
+        @endisset
+
         @yield('wizard')
     </div>
 @endsection

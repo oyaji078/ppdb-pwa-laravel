@@ -194,13 +194,13 @@ class AdminPageSmokeTest extends TestCase
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
 
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $config['wave']->id,
-            'admission_track_id' => $config['track']->id,
-        ]);
+        // Step zero is public; the rest of the form sits behind the applicant
+        // session opened by creating the account.
+        $this->get(route('registration.start'))->assertOk('Langkah buat akun gagal dirender.');
+
+        $draft = $this->createAccountFor($config);
 
         $routes = [
-            'registration.start',
             'registration.biodata',
             'registration.address',
             'registration.parents',
@@ -211,7 +211,9 @@ class AdminPageSmokeTest extends TestCase
         ];
 
         foreach ($routes as $name) {
-            $this->get(route($name))->assertOk("Langkah {$name} gagal dirender.");
+            $this->actingAsApplicant($draft)
+                ->get(route($name))
+                ->assertOk("Langkah {$name} gagal dirender.");
         }
     }
 

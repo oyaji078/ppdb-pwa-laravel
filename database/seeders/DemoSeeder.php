@@ -14,7 +14,6 @@ use App\Models\Program;
 use App\Models\Registration;
 use App\Models\RegistrationWave;
 use App\Models\User;
-use App\Services\AccessCodeService;
 use App\Services\RegistrationNumberService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +29,12 @@ use Illuminate\Support\Str;
  */
 class DemoSeeder extends Seeder
 {
+    /**
+     * Access code every demo applicant shares, so the portal can be logged into
+     * without a password reset. Applicants choose their own on the real form.
+     */
+    public const DEMO_ACCESS_CODE = 'Demo#12345';
+
     public function run(): void
     {
         if (app()->isProduction()) {
@@ -140,11 +145,17 @@ class DemoSeeder extends Seeder
             ['Dewi Ayu Lestari', 'P'], ['Bagus Prasetyo Wibowo', 'L'], ['Nabila Zahra Amelia', 'P'],
             ['Fajar Nugroho Saputra', 'L'], ['Intan Permata Sari', 'P'], ['Rahmat Hidayat Nurdin', 'L'],
             ['Aisyah Kamila Rahma', 'P'], ['Yusuf Maulana Ibrahim', 'L'], ['Salsabila Anindya Putri', 'P'],
+            ['Hafiz Abdurrahman Syah', 'L'], ['Zahra Fitriani Azzahra', 'P'], ['Ilham Kurniawan Pratama', 'L'],
+            ['Khairunnisa Aulia Rizki', 'P'], ['Arif Setiawan Hakim', 'L'], ['Maulida Rahmawati Sari', 'P'],
+            ['Zaki Firmansyah Alwi', 'L'], ['Hanifah Nur Syafiqah', 'P'],
         ];
+
+        // Timestamps are spread relative to the list size, so growing $names
+        // cannot push submitted_at into the future.
+        $total = count($names);
 
         $schools = ['SMP Negeri 1 Peneda', 'MTs Negeri 2 Lombok Timur', 'SMP Islam Hamzanwadi', 'SMP Negeri 3 Selong'];
         $numbers = app(RegistrationNumberService::class);
-        $accessCodes = app(AccessCodeService::class);
 
         foreach ($names as $index => [$fullName, $gender]) {
             $nisn = str_pad((string) (9000000001 + $index), 10, '0', STR_PAD_LEFT);
@@ -154,8 +165,8 @@ class DemoSeeder extends Seeder
             }
 
             DB::transaction(function () use (
-                $index, $fullName, $gender, $nisn, $year, $wave, $tracks, $programs,
-                $schools, $numbers, $accessCodes
+                $index, $total, $fullName, $gender, $nisn, $year, $wave, $tracks, $programs,
+                $schools, $numbers
             ): void {
                 $applicant = Applicant::query()->create([
                     'nisn' => $nisn,
@@ -172,6 +183,22 @@ class DemoSeeder extends Seeder
                     'email' => Str::slug(Str::before($fullName, ' ')).$index.'@example.test',
                 ]);
 
+                // Not fillable by design, so it is set explicitly.
+                $applicant->markEmailAsVerified();
+
+                // Applicants sign in through the same form as staff, so each one
+                // needs a user account with the applicant role.
+                $account = User::query()->create([
+                    'username' => null,
+                    'name' => $fullName,
+                    'email' => $applicant->email,
+                    'password' => self::DEMO_ACCESS_CODE,
+                    'role' => UserRole::Applicant,
+                    'phone' => $applicant->phone,
+                    'is_active' => true,
+                    'email_verified_at' => now(),
+                ]);
+
                 $applicant->address()->create([
                     'province' => 'Nusa Tenggara Barat',
                     'regency' => 'Lombok Timur',
@@ -185,7 +212,7 @@ class DemoSeeder extends Seeder
                     [
                         'relationship' => 'father',
                         'name' => 'Bapak '.Str::before($fullName, ' '),
-                        'birth_year' => 1980 + ($index % 8),
+                        'birth_date' => now()->subYears(45 - ($index % 8))->startOfYear()->addDays($index % 300)->toDateString(),
                         'education' => 'SMA/Sederajat',
                         'occupation' => ['Petani', 'Wiraswasta', 'Guru', 'Buruh'][$index % 4],
                         'monthly_income' => 'Rp1.000.000 - Rp2.000.000',
@@ -195,7 +222,7 @@ class DemoSeeder extends Seeder
                     [
                         'relationship' => 'mother',
                         'name' => 'Ibu '.Str::before($fullName, ' '),
-                        'birth_year' => 1984 + ($index % 6),
+                        'birth_date' => now()->subYears(41 - ($index % 6))->startOfYear()->addDays($index % 280)->toDateString(),
                         'education' => 'SMP/Sederajat',
                         'occupation' => 'Ibu Rumah Tangga',
                         'monthly_income' => 'Tidak Berpenghasilan',
@@ -216,6 +243,7 @@ class DemoSeeder extends Seeder
 
                 $registration = Registration::query()->create([
                     'applicant_id' => $applicant->id,
+                    'user_id' => $account->id,
                     'academic_year_id' => $year->id,
                     'registration_wave_id' => $wave->id,
                     'admission_track_id' => $tracks[$index % $tracks->count()]->id,
@@ -226,9 +254,8 @@ class DemoSeeder extends Seeder
 
                 $registration->forceFill([
                     'registration_number' => $numbers->generate($year, $wave),
-                    'access_code_hash' => $accessCodes->hash($accessCodes->generate()),
                     'registration_status' => $this->demoStatus($index),
-                    'submitted_at' => now()->subDays(12 - $index),
+                    'submitted_at' => now()->subDays($total - $index),
                 ])->save();
 
                 if ($registration->registration_status === RegistrationStatus::Verified) {

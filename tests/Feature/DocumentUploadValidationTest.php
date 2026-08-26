@@ -20,8 +20,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         $document = app(DocumentService::class)->store(
             $registration,
@@ -45,8 +44,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Format berkas tidak didukung');
@@ -63,8 +61,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         $config['documentTypes']['kk']->update(['max_size_kb' => 500]);
 
@@ -82,8 +79,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         // Extension says PDF, content says something else: a rename attack.
         $this->expectException(ValidationException::class);
@@ -100,8 +96,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         $service = app(DocumentService::class);
         $disk = Storage::disk(config('ppdb.storage.disk'));
@@ -124,8 +119,7 @@ class DocumentUploadValidationTest extends TestCase
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
-        $registration = app(RegistrationService::class)
-            ->startDraft($config['year'], $config['wave'], $config['track']);
+        $registration = $this->createAccountFor($config);
 
         $service = app(DocumentService::class);
 
@@ -141,19 +135,30 @@ class DocumentUploadValidationTest extends TestCase
             UploadedFile::fake()->create('kk-baru.pdf', 100, 'application/pdf'));
     }
 
-    public function test_files_move_under_the_registration_number_after_submission(): void
+    /**
+     * The registration number is issued when the account is opened, so uploads
+     * land in their final folder immediately — there is no longer a draft
+     * folder for them to be moved out of on submission.
+     */
+    public function test_files_are_stored_under_the_registration_number_from_the_start(): void
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
         $registration = $this->createSubmittableDraft($config);
 
-        $this->assertStringContainsString('draft-', $registration->documents->first()->storage_path);
+        $this->assertNotNull($registration->registration_number);
+
+        foreach ($registration->documents as $document) {
+            $this->assertStringContainsString($registration->registration_number, $document->storage_path);
+            $this->assertStringNotContainsString('draft-', $document->storage_path);
+        }
 
         app(RegistrationService::class)->submit($registration, statementAgreed: true);
 
         $registration->refresh()->load('documents');
         $disk = Storage::disk(config('ppdb.storage.disk'));
 
+        // Submission must leave the paths untouched and the files in place.
         foreach ($registration->documents as $document) {
             $this->assertStringContainsString($registration->registration_number, $document->storage_path);
             $this->assertStringNotContainsString('draft-', $document->storage_path);

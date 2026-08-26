@@ -62,7 +62,7 @@ class ApplicantDocumentAuthorizationTest extends TestCase
         $document = $registration->fresh()->documents()->firstOrFail();
 
         $this->get(route('applicant.documents.preview', $document))
-            ->assertRedirect(route('status.form'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_an_applicant_cannot_upload_against_another_registration(): void

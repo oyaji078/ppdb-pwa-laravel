@@ -78,7 +78,7 @@
     <strong>Penting</strong>
     Kode akses lama sudah tidak berlaku dan seluruh sesi sebelumnya telah dihentikan.
     Gunakan kode di atas bersama nomor pendaftaran untuk masuk ke portal pendaftar melalui
-    {{ route('status.form') }}. Dokumen ini hanya dapat diunduh satu kali dan tidak disimpan oleh sistem.
+    {{ route('login') }}. Dokumen ini hanya dapat diunduh satu kali dan tidak disimpan oleh sistem.
     Simpan baik-baik serta jangan membagikannya kepada orang lain.
 </div>
 

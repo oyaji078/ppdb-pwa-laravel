@@ -22,7 +22,7 @@ class EnsureUserIsActive
             $request->session()->regenerateToken();
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->withErrors(['username' => 'Akun Anda sedang dinonaktifkan. Hubungi Super Admin.']);
         }
 

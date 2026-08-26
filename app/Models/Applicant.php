@@ -26,7 +26,22 @@ class Applicant extends Model
             'birth_date' => 'date',
             'child_order' => 'integer',
             'siblings_count' => 'integer',
+            'email_verified_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Deliberately not fillable: verification is set by following the emailed
+     * link, never by submitting a form.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null && filled($this->email);
+    }
+
+    public function markEmailAsVerified(): void
+    {
+        $this->forceFill(['email_verified_at' => now()])->save();
     }
 
     /** @return HasOne<ApplicantAddress, $this> */

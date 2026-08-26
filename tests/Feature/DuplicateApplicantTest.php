@@ -29,7 +29,9 @@ class DuplicateApplicantTest extends TestCase
         try {
             $service->submit($second, statementAgreed: true);
         } finally {
-            $this->assertNull($second->fresh()->registration_number);
+            // The number was issued at sign-up and stays; what must not happen
+            // is a second *submission* for the same NISN.
+            $this->assertNull($second->fresh()->submitted_at);
             $this->assertSame(1, Registration::query()->whereNotNull('submitted_at')->count());
         }
     }
@@ -88,7 +90,7 @@ class DuplicateApplicantTest extends TestCase
         $config = $this->createPpdbConfiguration();
         $service = app(RegistrationService::class);
 
-        $first = $service->startDraft($config['year'], $config['wave'], $config['track']);
+        $first = $this->createAccountFor($config);
 
         $this->expectException(UniqueConstraintViolationException::class);
 

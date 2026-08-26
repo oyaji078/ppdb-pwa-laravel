@@ -43,15 +43,33 @@
                 @endforeach
             </div>
 
+            {{-- Signed in: show where to go and how to get out. Showing "Masuk"
+                 to someone already signed in sends them to a login page that
+                 bounces them straight back, with no way to switch account. --}}
             <div class="hidden items-center gap-2 lg:flex">
-                <a href="{{ route('status.form') }}" class="btn-secondary btn-sm">
-                    <x-icon name="search" class="h-4 w-4" />
-                    Cek Status
-                </a>
-                <a href="{{ route('registration.start') }}" class="btn-primary btn-sm">
-                    <x-icon name="user-plus" class="h-4 w-4" />
-                    Daftar
-                </a>
+                @auth
+                    <a href="{{ auth()->user()->homeUrl() }}" class="btn-secondary btn-sm">
+                        <x-icon name="layout-dashboard" class="h-4 w-4" />
+                        {{ auth()->user()->isApplicant() ? 'Pendaftaran Saya' : 'Panel Admin' }}
+                    </a>
+
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="btn-primary btn-sm">
+                            <x-icon name="log-out" class="h-4 w-4" />
+                            Keluar
+                        </button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="btn-secondary btn-sm">
+                        <x-icon name="log-in" class="h-4 w-4" />
+                        Masuk
+                    </a>
+                    <a href="{{ route('registration.start') }}" class="btn-primary btn-sm">
+                        <x-icon name="user-plus" class="h-4 w-4" />
+                        Daftar
+                    </a>
+                @endauth
             </div>
 
             <button type="button" @click="open = ! open" :aria-expanded="open.toString()"
@@ -77,8 +95,18 @@
                 @endforeach
 
                 <div class="grid grid-cols-2 gap-2 pt-3">
-                    <a href="{{ route('status.form') }}" class="btn-secondary btn-sm">Cek Status</a>
-                    <a href="{{ route('registration.start') }}" class="btn-primary btn-sm">Daftar</a>
+                    @auth
+                        <a href="{{ auth()->user()->homeUrl() }}" class="btn-secondary btn-sm">
+                            {{ auth()->user()->isApplicant() ? 'Pendaftaran Saya' : 'Panel Admin' }}
+                        </a>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="btn-primary btn-sm w-full">Keluar</button>
+                        </form>
+                    @else
+                        <a href="{{ route('login') }}" class="btn-secondary btn-sm">Masuk</a>
+                        <a href="{{ route('registration.start') }}" class="btn-primary btn-sm">Daftar</a>
+                    @endauth
                 </div>
             </div>
         </div>

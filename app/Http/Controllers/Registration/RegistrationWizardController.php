@@ -8,14 +8,11 @@ use App\Http\Requests\Registration\BiodataRequest;
 use App\Http\Requests\Registration\ParentGuardianRequest;
 use App\Http\Requests\Registration\PreviousSchoolRequest;
 use App\Http\Requests\Registration\ProgramSelectionRequest;
-use App\Http\Requests\Registration\StartRegistrationRequest;
-use App\Models\AcademicYear;
-use App\Models\AdmissionTrack;
 use App\Models\Registration;
-use App\Models\RegistrationWave;
+use App\Services\ApplicantMailer;
 use App\Services\PdfService;
 use App\Services\RegistrationService;
-use App\Support\RegistrationDraft;
+use App\Support\ApplicantSession;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,59 +20,36 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * The eight-step public registration form.
+ * The seven-step registration form, filled in after the applicant has opened an
+ * account and logged in.
  *
- * Each step persists immediately, so a visitor can close the browser and pick
- * up where they left off as long as the session survives.
+ * Each step persists immediately, so an applicant can close the browser and
+ * pick up where they left off by logging back in.
  */
 class RegistrationWizardController extends Controller
 {
+    /**
+     * Maps the persisted step name back onto its route, so an applicant who
+     * logs back in lands where they left off.
+     */
+    private const STEP_ROUTES = [
+        'biodata' => 'registration.biodata',
+        'alamat' => 'registration.address',
+        'orang-tua' => 'registration.parents',
+        'asal-sekolah' => 'registration.previous-school',
+        'program' => 'registration.program',
+        'berkas' => 'registration.documents',
+        'review' => 'registration.review',
+    ];
+
     public function __construct(
-        private readonly RegistrationDraft $draft,
+        private readonly ApplicantSession $session,
         private readonly RegistrationService $registrations,
         private readonly PdfService $pdf,
+        private readonly ApplicantMailer $mailer,
     ) {}
 
-    // -- Step 1: Data Pendaftaran --------------------------------------------
-
-    public function start(): View|RedirectResponse
-    {
-        $year = AcademicYear::current();
-        $draft = $this->draft->current();
-
-        if ($year === null || ! $year->registration_open) {
-            return redirect()->route('ppdb.index')
-                ->with('warning', 'Pendaftaran sedang tidak dibuka. Silakan periksa jadwal penerimaan.');
-        }
-
-        return view('registration.start', [
-            'academicYear' => $year,
-            'draft' => $draft,
-            'waves' => $year->waves()->open()->orderBy('code')->get(),
-            'tracks' => AdmissionTrack::query()
-                ->where('academic_year_id', $year->id)->active()->orderBy('sort_order')->get(),
-        ]);
-    }
-
-    public function storeStart(StartRegistrationRequest $request): RedirectResponse
-    {
-        $year = AcademicYear::current();
-        $wave = RegistrationWave::query()->findOrFail($request->integer('registration_wave_id'));
-        $track = AdmissionTrack::query()->findOrFail($request->integer('admission_track_id'));
-
-        $draft = $this->draft->current();
-
-        if ($draft === null) {
-            $draft = $this->registrations->startDraft($year, $wave, $track);
-            $this->draft->remember($draft);
-        } else {
-            $this->registrations->updateDraftChoice($draft, $wave, $track);
-        }
-
-        return redirect()->route('registration.biodata');
-    }
-
-    // -- Step 2: Biodata ------------------------------------------------------
+    // -- Step 1: Biodata ------------------------------------------------------
 
     public function biodata(): View|RedirectResponse
     {
@@ -95,7 +69,18 @@ class RegistrationWizardController extends Controller
             return $draft;
         }
 
-        $draft->applicant->update($request->validated());
+        $applicant = $draft->applicant;
+        $previousEmail = $applicant->email;
+
+        $applicant->update($request->validated());
+
+        // A changed address has not been proved yet, so the old confirmation
+        // cannot carry over — drop it and send a fresh link.
+        if ($applicant->email !== $previousEmail) {
+            $applicant->forceFill(['email_verified_at' => null])->save();
+            $this->mailer->sendEmailVerification($draft);
+        }
+
         $this->registrations->advanceStep($draft, 'alamat');
 
         return redirect()->route('registration.address')
@@ -168,13 +153,17 @@ class RegistrationWizardController extends Controller
                 [
                     'name' => $data['name'] ?? null,
                     'nik' => $data['nik'] ?? null,
-                    'birth_year' => $data['birth_year'] ?? null,
+                    'birth_date' => $data['birth_date'] ?? null,
                     'education' => $data['education'] ?? null,
                     'occupation' => $data['occupation'] ?? null,
                     'monthly_income' => $data['monthly_income'] ?? null,
                     'phone' => $data['phone'] ?? null,
                     'address' => $data['address'] ?? null,
-                    'is_alive' => (bool) ($data['is_alive'] ?? true),
+                    // The guardian block has no "still living" box; only the
+                    // parents do, and their checkbox always reports its state.
+                    'is_alive' => $relationship === 'guardian'
+                        ? true
+                        : (bool) ($data['is_alive'] ?? false),
                 ]
             );
         }
@@ -276,43 +265,45 @@ class RegistrationWizardController extends Controller
             return $draft;
         }
 
-        $accessCode = $this->registrations->submit($draft, $request->boolean('statement_agreed'));
-
-        $this->draft->markSubmitted($draft);
-
-        // Plaintext code is flashed, never stored: this is the only time it can
-        // be shown to the applicant.
-        $request->session()->flash('ppdb_plain_access_code', $accessCode);
+        $this->registrations->submit($draft, $request->boolean('statement_agreed'));
 
         return redirect()->route('registration.success');
     }
 
-    public function success(Request $request): View|RedirectResponse
+    /**
+     * Shown right after submitting. The applicant is still logged in, so the
+     * registration comes from the session rather than a one-shot flash — the
+     * page can be reloaded, and there is no access code to reveal because the
+     * applicant chose it themselves at sign-up.
+     */
+    public function success(): View|RedirectResponse
     {
-        $registration = $this->draft->submitted();
+        $registration = $this->session->registration();
 
         if ($registration === null) {
-            return redirect()->route('registration.start');
+            return redirect()->route('login');
+        }
+
+        if ($registration->isDraft()) {
+            return redirect()->route('registration.resume');
         }
 
         return view('registration.success', [
             'registration' => $registration,
-            'accessCode' => $request->session()->get('ppdb_plain_access_code'),
             'statusUrl' => $this->pdf->statusUrl($registration),
         ]);
     }
 
     /**
-     * Receipt download offered on the success page, before the applicant has
-     * logged into the portal.
+     * Receipt download offered on the success page.
      */
     public function downloadReceipt(): Response|RedirectResponse
     {
-        $registration = $this->draft->submitted();
+        $registration = $this->session->registration();
 
-        if ($registration === null) {
-            return redirect()->route('status.form')
-                ->with('error', 'Sesi pendaftaran sudah berakhir. Masuk dengan nomor pendaftaran dan kode akses untuk mengunduh bukti.');
+        if ($registration === null || $registration->isDraft()) {
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda sudah berakhir. Masuk dengan nomor pendaftaran dan kode akses untuk mengunduh bukti.');
         }
 
         $document = $registration->generatedDocuments()
@@ -337,18 +328,48 @@ class RegistrationWizardController extends Controller
     }
 
     /**
-     * Every step past the first needs a draft; without one the visitor is sent
-     * back to the beginning.
+     * The form is filled in behind the applicant session, so the draft comes
+     * from whoever is logged in. The route middleware has already guaranteed a
+     * session; what is checked here is that it still belongs to a draft — once
+     * submitted, the registration is read-only and lives in the portal.
      */
     private function requireDraft(): Registration|RedirectResponse
     {
-        $draft = $this->draft->current();
+        $registration = $this->session->registration();
 
-        if ($draft === null) {
-            return redirect()->route('registration.start')
-                ->with('warning', 'Sesi pendaftaran belum dimulai atau sudah berakhir. Silakan mulai dari langkah pertama.');
+        if ($registration === null) {
+            return redirect()->route('login')
+                ->with('warning', 'Sesi Anda telah berakhir. Silakan masuk kembali.');
         }
 
-        return $draft;
+        if (! $registration->isDraft()) {
+            return redirect()->route('applicant.dashboard')
+                ->with('info', 'Pendaftaran Anda sudah dikirim dan tidak dapat diubah lagi.');
+        }
+
+        $registration->loadMissing([
+            'applicant.address', 'applicant.parentGuardians', 'applicant.previousSchool',
+            'academicYear', 'wave', 'admissionTrack', 'program', 'documents.documentType',
+        ]);
+
+        return $registration;
+    }
+
+    /**
+     * Sends a logged-in applicant back to whichever step they had reached.
+     */
+    public function resume(): RedirectResponse
+    {
+        $registration = $this->session->registration();
+
+        if ($registration === null) {
+            return redirect()->route('login');
+        }
+
+        if (! $registration->isDraft()) {
+            return redirect()->route('applicant.dashboard');
+        }
+
+        return redirect()->route(self::STEP_ROUTES[$registration->current_step] ?? 'registration.biodata');
     }
 }

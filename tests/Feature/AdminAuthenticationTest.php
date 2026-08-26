@@ -13,7 +13,7 @@ class AdminAuthenticationTest extends TestCase
 
     public function test_the_login_page_is_reachable(): void
     {
-        $this->get(route('admin.login'))
+        $this->get(route('login'))
             ->assertOk()
             ->assertSee('Masuk');
     }
@@ -22,8 +22,8 @@ class AdminAuthenticationTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $this->post(route('admin.login.store'), [
-            'username' => $admin->username,
+        $this->post(route('login.store'), [
+            'email' => $admin->username,
             'password' => 'password',
         ])->assertRedirect(route('admin.dashboard'));
 
@@ -34,8 +34,8 @@ class AdminAuthenticationTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $this->post(route('admin.login.store'), [
-            'username' => $admin->email,
+        $this->post(route('login.store'), [
+            'email' => $admin->email,
             'password' => 'password',
         ])->assertRedirect(route('admin.dashboard'));
 
@@ -46,13 +46,13 @@ class AdminAuthenticationTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $this->from(route('admin.login'))
-            ->post(route('admin.login.store'), [
-                'username' => $admin->username,
+        $this->from(route('login'))
+            ->post(route('login.store'), [
+                'email' => $admin->username,
                 'password' => 'salah-sekali',
             ])
-            ->assertRedirect(route('admin.login'))
-            ->assertSessionHasErrors('username');
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
 
         $this->assertGuest();
     }
@@ -61,10 +61,10 @@ class AdminAuthenticationTest extends TestCase
     {
         $admin = $this->createAdmin(attributes: ['is_active' => false]);
 
-        $this->post(route('admin.login.store'), [
-            'username' => $admin->username,
+        $this->post(route('login.store'), [
+            'email' => $admin->username,
             'password' => 'password',
-        ])->assertSessionHasErrors('username');
+        ])->assertSessionHasErrors('email');
 
         $this->assertGuest();
     }
@@ -79,20 +79,20 @@ class AdminAuthenticationTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
-            ->assertRedirect(route('admin.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_a_guest_cannot_open_the_dashboard(): void
     {
-        $this->get(route('admin.dashboard'))->assertRedirect(route('admin.login'));
+        $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
     }
 
     public function test_signing_in_and_out_is_written_to_the_activity_log(): void
     {
         $admin = $this->createAdmin();
 
-        $this->post(route('admin.login.store'), [
-            'username' => $admin->username,
+        $this->post(route('login.store'), [
+            'email' => $admin->username,
             'password' => 'password',
         ]);
 
@@ -101,7 +101,7 @@ class AdminAuthenticationTest extends TestCase
             'action' => ActivityLogger::LOGIN,
         ]);
 
-        $this->post(route('admin.logout'));
+        $this->post(route('logout'));
 
         $this->assertDatabaseHas('activity_logs', [
             'user_id' => $admin->id,
@@ -117,8 +117,8 @@ class AdminAuthenticationTest extends TestCase
 
         $this->assertNull($admin->last_login_at);
 
-        $this->post(route('admin.login.store'), [
-            'username' => $admin->username,
+        $this->post(route('login.store'), [
+            'email' => $admin->username,
             'password' => 'password',
         ]);
 

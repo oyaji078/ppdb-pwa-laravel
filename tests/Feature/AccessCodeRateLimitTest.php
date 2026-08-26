@@ -13,9 +13,9 @@ class AccessCodeRateLimitTest extends TestCase
     {
         $this->createPpdbConfiguration();
 
-        $attempt = fn () => $this->post(route('status.authenticate'), [
-            'registration_number' => '2601000001',
-            'access_code' => 'ABCDEFGH',
+        $attempt = fn () => $this->post(route('login.store'), [
+            'email' => 'pendaftar@example.test',
+            'password' => 'SalahSekali123',
         ]);
 
         // The configured limit is 5 attempts per minute per IP.
@@ -30,8 +30,8 @@ class AccessCodeRateLimitTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $attempt = fn () => $this->post(route('admin.login.store'), [
-            'username' => $admin->username,
+        $attempt = fn () => $this->post(route('login.store'), [
+            'email' => $admin->username,
             'password' => 'salah',
         ]);
 

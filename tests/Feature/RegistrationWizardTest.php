@@ -15,6 +15,7 @@ use App\Models\Registration;
 use App\Models\RegistrationWave;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -33,15 +34,15 @@ class RegistrationWizardTest extends TestCase
 
         $this->get(route('registration.start'))->assertOk();
 
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $config['wave']->id,
-            'admission_track_id' => $config['track']->id,
-        ])->assertRedirect(route('registration.biodata'));
+        $this->openAccount($config)->assertRedirect(route('registration.biodata'));
 
         $draft = Registration::query()->firstOrFail();
 
         $this->assertSame(RegistrationStatus::Draft, $draft->registration_status);
-        $this->assertNull($draft->registration_number);
+        // Credentials are issued up front so the applicant can log back in.
+        $this->assertNotNull($draft->registration_number);
+        $this->assertNotNull($draft->user, 'akun pendaftar dibuat bersama pendaftaran');
+        $this->assertTrue($draft->user->isApplicant());
 
         $this->post(route('registration.biodata.store'), $this->biodata())
             ->assertRedirect(route('registration.address'))
@@ -74,10 +75,7 @@ class RegistrationWizardTest extends TestCase
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
 
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $config['wave']->id,
-            'admission_track_id' => $config['track']->id,
-        ]);
+        $this->openAccount($config);
 
         $this->from(route('registration.biodata'))
             ->post(route('registration.biodata.store'), array_merge($this->biodata(), ['nisn' => '123']))
@@ -89,10 +87,7 @@ class RegistrationWizardTest extends TestCase
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
 
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $config['wave']->id,
-            'admission_track_id' => $config['track']->id,
-        ]);
+        $this->openAccount($config);
         $this->post(route('registration.biodata.store'), $this->biodata());
 
         $this->get(route('registration.review'))
@@ -112,15 +107,36 @@ class RegistrationWizardTest extends TestCase
             ->post(route('registration.submit'), [])
             ->assertSessionHasErrors('statement_agreed');
 
-        $this->assertNull(Registration::query()->firstOrFail()->registration_number);
+        $this->assertNull(Registration::query()->firstOrFail()->submitted_at);
     }
 
-    public function test_the_wizard_cannot_be_resumed_without_a_session(): void
+    /**
+     * The form now lives behind the applicant session, so a visitor without one
+     * is sent to the login page rather than back to step one.
+     */
+    public function test_the_form_cannot_be_opened_without_signing_in(): void
     {
         $this->createPpdbConfiguration();
 
-        $this->get(route('registration.biodata'))->assertRedirect(route('registration.start'));
-        $this->get(route('registration.review'))->assertRedirect(route('registration.start'));
+        $this->get(route('registration.biodata'))->assertRedirect(route('login'));
+        $this->get(route('registration.review'))->assertRedirect(route('login'));
+        $this->get(route('registration.documents'))->assertRedirect(route('login'));
+    }
+
+    public function test_a_second_account_cannot_be_opened_for_the_same_nisn(): void
+    {
+        $this->fakePrivateDisk();
+        $config = $this->createPpdbConfiguration();
+
+        $this->openAccount($config)->assertRedirect(route('registration.biodata'));
+
+        $this->post(route('logout'));
+
+        $this->from(route('registration.start'))
+            ->openAccount($config)
+            ->assertSessionHasErrors('nisn');
+
+        $this->assertSame(1, Registration::query()->count());
     }
 
     public function test_registration_is_blocked_when_the_year_is_closed(): void
@@ -139,8 +155,8 @@ class RegistrationWizardTest extends TestCase
         // --- 1. Admin signs in and builds the configuration -----------------
         $superAdmin = $this->createAdmin(UserRole::SuperAdmin);
 
-        $this->post(route('admin.login.store'), [
-            'username' => $superAdmin->username,
+        $this->post(route('login.store'), [
+            'email' => $superAdmin->email,
             'password' => 'password',
         ])->assertRedirect(route('admin.dashboard'));
 
@@ -212,15 +228,13 @@ class RegistrationWizardTest extends TestCase
 
         $this->assertSame(1, $track->fresh()->documentTypes()->count());
 
-        $this->post(route('admin.logout'));
+        $this->post(route('logout'));
 
         // --- 2. An applicant registers --------------------------------------
         $this->get(route('home'))->assertOk()->assertSee('Daftar Sekarang');
 
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $wave->id,
-            'admission_track_id' => $track->id,
-        ])->assertRedirect(route('registration.biodata'));
+        $this->openAccount(['wave' => $wave, 'track' => $track])
+            ->assertRedirect(route('registration.biodata'));
 
         $this->post(route('registration.biodata.store'), $this->biodata());
         $this->post(route('registration.address.store'), $this->address());
@@ -244,32 +258,31 @@ class RegistrationWizardTest extends TestCase
         $this->assertSame('2601000001', $registration->registration_number);
         $this->assertSame(RegistrationStatus::Submitted, $registration->registration_status);
 
-        // The plaintext code is flashed by the submit request and rendered once
-        // on the success page; it is never persisted anywhere.
-        $accessCode = session('ppdb_plain_access_code');
-        $this->assertNotNull($accessCode);
-        $this->assertSame(8, strlen($accessCode));
+        // The applicant chose the access code at sign-up, so the success page
+        // shows the number only and can be reloaded safely.
+        $accessCode = self::ACCESS_CODE;
 
         $this->get(route('registration.success'))
             ->assertOk()
             ->assertSee($registration->registration_number)
-            ->assertSee($accessCode)
-            ->assertSee('Simpan kode akses');
+            ->assertDontSee($accessCode)
+            ->assertSee('Cara masuk kembali');
 
-        // Reloading no longer reveals it.
         $this->get(route('registration.success'))
             ->assertOk()
-            ->assertDontSee($accessCode)
-            ->assertSee('tidak dapat ditampilkan ulang');
+            ->assertSee($registration->registration_number)
+            ->assertDontSee($accessCode);
 
         $this->get(route('registration.success.receipt'))
             ->assertOk()
             ->assertHeader('Content-Type', 'application/pdf');
 
         // --- 4. Applicant signs in with number + code ------------------------
-        $this->post(route('status.authenticate'), [
-            'registration_number' => $registration->registration_number,
-            'access_code' => $accessCode,
+        $this->post(route('logout'));
+
+        $this->post(route('login.store'), [
+            'email' => $registration->user->email,
+            'password' => $accessCode,
         ])->assertRedirect(route('applicant.dashboard'));
 
         $this->get(route('applicant.dashboard'))
@@ -432,7 +445,7 @@ class RegistrationWizardTest extends TestCase
             'father' => [
                 'name' => 'Muhammad Yusuf',
                 'nik' => '5203010101800001',
-                'birth_year' => '1980',
+                'birth_date' => '1980-04-12',
                 'education' => 'SMA/Sederajat',
                 'occupation' => 'Petani',
                 'monthly_income' => 'Rp1.000.000 - Rp2.000.000',
@@ -442,7 +455,7 @@ class RegistrationWizardTest extends TestCase
             'mother' => [
                 'name' => 'Siti Aminah',
                 'nik' => '5203010101850001',
-                'birth_year' => '1985',
+                'birth_date' => '1985-09-30',
                 'education' => 'SMP/Sederajat',
                 'occupation' => 'Ibu Rumah Tangga',
                 'monthly_income' => 'Tidak Berpenghasilan',
@@ -470,14 +483,32 @@ class RegistrationWizardTest extends TestCase
     }
 
     /**
+     * Step zero of the real flow: open the account and land logged in on the
+     * first form step. Identity matches biodata() so the two never disagree.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $overrides
+     */
+    private function openAccount(array $config, array $overrides = []): TestResponse
+    {
+        return $this->post(route('registration.start.store'), array_merge([
+            'registration_wave_id' => $config['wave']->id,
+            'admission_track_id' => $config['track']->id,
+            'full_name' => 'Ahmad Fauzi',
+            'nisn' => '1234567890',
+            'phone' => '081234567890',
+            'email' => 'ahmad@example.test',
+            'password' => self::ACCESS_CODE,
+            'password_confirmation' => self::ACCESS_CODE,
+        ], $overrides));
+    }
+
+    /**
      * @param  array<string, mixed>  $config
      */
     private function completeWizard(array $config): void
     {
-        $this->post(route('registration.start.store'), [
-            'registration_wave_id' => $config['wave']->id,
-            'admission_track_id' => $config['track']->id,
-        ]);
+        $this->openAccount($config);
         $this->post(route('registration.biodata.store'), $this->biodata());
         $this->post(route('registration.address.store'), $this->address());
         $this->post(route('registration.parents.store'), $this->parents());

@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Registration;
 
 use App\Services\RegistrationService;
-use App\Support\RegistrationDraft;
+use App\Support\ApplicantSession;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -32,7 +32,7 @@ class BiodataRequest extends FormRequest
             'child_order' => ['nullable', 'integer', 'min:1', 'max:20'],
             'siblings_count' => ['nullable', 'integer', 'min:0', 'max:20'],
             'phone' => ['required', 'string', 'max:25', 'regex:/^[0-9+\-\s()]+$/'],
-            'email' => ['nullable', 'email:rfc', 'max:150'],
+            'email' => ['required', 'email:rfc', 'max:150'],
         ];
     }
 
@@ -45,7 +45,7 @@ class BiodataRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                $draft = app(RegistrationDraft::class)->current();
+                $draft = app(ApplicantSession::class)->registration();
                 $nisn = (string) $this->input('nisn');
 
                 if ($draft === null || $nisn === '') {

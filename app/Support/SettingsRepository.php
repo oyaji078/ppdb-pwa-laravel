@@ -42,7 +42,28 @@ class SettingsRepository
         'maintenance_message' => '',
         'hero_title' => '',
         'hero_subtitle' => '',
+        'hero_banner' => '',
+        'hero_overlay' => '60',
         'faq' => '',
+
+        // School location, shown as an embedded map on the contact page.
+        'map_latitude' => '',
+        'map_longitude' => '',
+        'map_zoom' => '16',
+        'map_place_name' => '',
+
+        // Outgoing mail. Configured from the admin panel so a school can move
+        // hosts without touching .env; mail_password is stored encrypted.
+        'mail_enabled' => '0',
+        'mail_mailer' => 'smtp',
+        'mail_host' => '',
+        'mail_port' => '587',
+        'mail_username' => '',
+        'mail_password' => '',
+        'mail_encryption' => 'tls',
+        'mail_from_address' => '',
+        'mail_from_name' => '',
+        'mail_require_verification' => '0',
     ];
 
     /**
@@ -130,6 +151,75 @@ class SettingsRepository
         }
 
         return Storage::disk('public')->url($path);
+    }
+
+    /**
+     * Public URL of the uploaded homepage banner, or null when the hero should
+     * fall back to its plain brand colour.
+     */
+    public function heroBannerUrl(): ?string
+    {
+        $path = $this->get('hero_banner');
+
+        if (! $path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($path);
+    }
+
+    /**
+     * How dark the scrim over the banner is, as a 0..1 CSS opacity. Text on the
+     * hero has to stay readable whatever photo the school uploads.
+     */
+    public function heroOverlayOpacity(): float
+    {
+        $percent = (int) ($this->get('hero_overlay') ?? 60);
+
+        return max(0, min(90, $percent)) / 100;
+    }
+
+    /**
+     * Whether a location has been configured well enough to draw a map.
+     */
+    public function hasMapLocation(): bool
+    {
+        return is_numeric($this->get('map_latitude')) && is_numeric($this->get('map_longitude'));
+    }
+
+    /**
+     * Embeddable Google Maps URL. Uses the plain `output=embed` form, which
+     * needs no API key and no billing account — a school can paste coordinates
+     * and be done.
+     */
+    public function mapEmbedUrl(): ?string
+    {
+        if (! $this->hasMapLocation()) {
+            return null;
+        }
+
+        return sprintf(
+            'https://www.google.com/maps?q=%s,%s&z=%d&hl=id&output=embed',
+            $this->get('map_latitude'),
+            $this->get('map_longitude'),
+            (int) ($this->get('map_zoom') ?: 16),
+        );
+    }
+
+    /**
+     * Link that opens the location in the Google Maps app or website.
+     */
+    public function mapLinkUrl(): ?string
+    {
+        if (! $this->hasMapLocation()) {
+            return null;
+        }
+
+        return sprintf(
+            'https://www.google.com/maps/search/?api=1&query=%s,%s',
+            $this->get('map_latitude'),
+            $this->get('map_longitude'),
+        );
     }
 
     /**

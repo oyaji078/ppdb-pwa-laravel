@@ -17,8 +17,8 @@ class AdminDocumentAuthorizationTest extends TestCase
     {
         $document = $this->submittedDocument();
 
-        $this->get(route('admin.documents.preview', $document))->assertRedirect(route('admin.login'));
-        $this->get(route('admin.documents.download', $document))->assertRedirect(route('admin.login'));
+        $this->get(route('admin.documents.preview', $document))->assertRedirect(route('login'));
+        $this->get(route('admin.documents.download', $document))->assertRedirect(route('login'));
     }
 
     public function test_every_admin_role_may_read_documents(): void

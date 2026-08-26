@@ -9,7 +9,7 @@
 ])
 
 @php
-    $id = $attributes->get('id', $name);
+    $id = $attributes->get('id', str_replace('.', '_', $name));
     $errorId = $id.'-error';
     $hintId = $id.'-hint';
     $hasError = $errors->has($name);
@@ -27,14 +27,14 @@
     @endif
 
     <textarea
-        name="{{ $name }}"
+        name="{{ field_name($name) }}"
         id="{{ $id }}"
         rows="{{ $rows }}"
         @if ($placeholder) placeholder="{{ $placeholder }}" @endif
         @if ($required) required aria-required="true" @endif
         @if ($hasError) aria-invalid="true" @endif
         aria-describedby="{{ trim(($hasError ? $errorId.' ' : '').($hint ? $hintId : '')) ?: null }}"
-        {{ $attributes->merge(['class' => 'form-input'.($hasError ? ' ring-rose-400 focus:ring-rose-500' : '')]) }}
+        {{ $attributes->except('id')->merge(['class' => 'form-input'.($hasError ? ' ring-rose-400 focus:ring-rose-500' : '')]) }}
     >{{ old($name, $value) }}</textarea>
 
     @if ($hint)

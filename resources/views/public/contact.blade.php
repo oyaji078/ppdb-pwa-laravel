@@ -43,6 +43,33 @@
             @endforelse
         </div>
 
+        @if ($settings->hasMapLocation())
+            <div class="card mt-6 overflow-hidden">
+                <div class="flex flex-col gap-3 p-6 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0">
+                        <h2 class="font-semibold text-slate-900">Lokasi Sekolah</h2>
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ $settings->get('map_place_name') ?: $settings->schoolName() }}
+                        </p>
+                    </div>
+
+                    <a href="{{ $settings->mapLinkUrl() }}" target="_blank" rel="noopener"
+                       class="btn-secondary btn-sm shrink-0">
+                        <x-icon name="map-pin" class="h-4 w-4" />
+                        Buka di Google Maps
+                    </a>
+                </div>
+
+                {{-- output=embed needs no API key, so the school pastes
+                     coordinates and the map simply works. --}}
+                <iframe src="{{ $settings->mapEmbedUrl() }}"
+                        title="Peta lokasi {{ $settings->schoolName() }}"
+                        class="h-80 w-full border-0"
+                        loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                        allowfullscreen></iframe>
+            </div>
+        @endif
+
         <div class="card mt-6 p-6">
             <h2 class="font-semibold text-slate-900">Jam Layanan Panitia</h2>
             <p class="prose-content mt-2">

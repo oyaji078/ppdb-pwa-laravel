@@ -106,7 +106,7 @@
     </nav>
 
     <div class="border-t border-slate-800 p-3">
-        <form method="POST" action="{{ route('admin.logout') }}">
+        <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-rose-400 hover:bg-slate-800">
                 <x-icon name="log-out" class="h-5 w-5 shrink-0" />

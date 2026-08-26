@@ -3,12 +3,15 @@
 namespace App\Services;
 
 use App\Enums\RegistrationStatus;
+use App\Enums\UserRole;
 use App\Models\AcademicYear;
 use App\Models\AdmissionTrack;
 use App\Models\Applicant;
 use App\Models\Program;
 use App\Models\Registration;
 use App\Models\RegistrationWave;
+use App\Models\User;
+use App\Support\MailConfigurator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -31,20 +34,79 @@ class RegistrationService
      * Create the draft that backs the wizard. The applicant record starts
      * empty and is filled in by the biodata step.
      */
-    public function startDraft(AcademicYear $year, RegistrationWave $wave, AdmissionTrack $track): Registration
-    {
-        return DB::transaction(function () use ($year, $wave, $track): Registration {
-            $applicant = Applicant::query()->create(['full_name' => '']);
+    /**
+     * Create the applicant account that the registration form is filled in
+     * behind.
+     *
+     * The applicant becomes an ordinary `user` with the applicant role, because
+     * everybody in the system signs in through the same form and the role
+     * decides where they land.
+     *
+     * The registration number is issued here rather than at submission time: the
+     * applicant needs an account before they can log in and start the form. A
+     * number is therefore consumed by every account created, including ones that
+     * are never completed — abandoned drafts are cleaned up by the
+     * ppdb:prune-drafts command.
+     *
+     * @param  array{full_name: string, nisn: string, phone: string, email: string}  $identity
+     */
+    public function registerAccount(
+        AcademicYear $year,
+        RegistrationWave $wave,
+        AdmissionTrack $track,
+        array $identity,
+        string $password,
+    ): Registration {
+        return DB::transaction(function () use ($year, $wave, $track, $identity, $password): Registration {
+            $applicant = Applicant::query()->create([
+                'full_name' => $identity['full_name'],
+                'nisn' => $identity['nisn'],
+                'phone' => $identity['phone'],
+                'email' => $identity['email'],
+            ]);
 
-            return Registration::query()->create([
+            $user = User::query()->create([
+                'username' => null,
+                'name' => $identity['full_name'],
+                'email' => $identity['email'],
+                'password' => $password,
+                'role' => UserRole::Applicant,
+                'phone' => $identity['phone'],
+                'is_active' => true,
+            ]);
+
+            $registration = Registration::query()->create([
                 'applicant_id' => $applicant->id,
+                'user_id' => $user->id,
                 'academic_year_id' => $year->id,
                 'registration_wave_id' => $wave->id,
                 'admission_track_id' => $track->id,
                 'registration_status' => RegistrationStatus::Draft,
                 'current_step' => 'biodata',
             ]);
+
+            // generate() must run inside this transaction: it holds the counter
+            // row with lockForUpdate() so two concurrent sign-ups cannot be
+            // handed the same sequence.
+            $registration->forceFill([
+                'registration_number' => $this->numbers->generate($year, $wave),
+            ])->save();
+
+            return $registration->refresh();
         });
+    }
+
+    /**
+     * The registration an applicant already holds for this year, if any. Used to
+     * stop one student opening a second account, and to point them at the login
+     * form when they simply forgot they had one.
+     */
+    public function existingRegistrationForNisn(string $nisn, int $academicYearId): ?Registration
+    {
+        return Registration::query()
+            ->where('academic_year_id', $academicYearId)
+            ->whereHas('applicant', fn ($query) => $query->where('nisn', $nisn))
+            ->first();
     }
 
     /**
@@ -116,21 +178,25 @@ class RegistrationService
             $blockers[] = 'Gelombang pendaftaran yang Anda pilih sedang tidak dibuka.';
         }
 
+        // Only when the committee has switched the requirement on, so a school
+        // without working SMTP can never be locked out of its own admissions.
+        if (app(MailConfigurator::class)->requiresVerification() && ! $applicant->hasVerifiedEmail()) {
+            $blockers[] = 'Email Anda belum diverifikasi. Buka tautan verifikasi yang kami kirim, atau kirim ulang dari halaman ini.';
+        }
+
         return $blockers;
     }
 
     /**
      * Final submit.
      *
-     * Runs entirely inside one transaction: number, access code, status, and
-     * the receipt PDF. Any failure rolls the whole thing back, so a
-     * registration number is never handed out for a half-saved record.
-     *
-     * @return string The plaintext access code — shown once, never stored.
+     * Runs entirely inside one transaction: status, timestamp and the receipt
+     * PDF. The number and access code already exist from account creation, so
+     * nothing is issued here.
      *
      * @throws ValidationException
      */
-    public function submit(Registration $registration, bool $statementAgreed): string
+    public function submit(Registration $registration, bool $statementAgreed): void
     {
         if (! $statementAgreed) {
             throw ValidationException::withMessages([
@@ -150,15 +216,12 @@ class RegistrationService
             throw ValidationException::withMessages(['statement_agreed' => $blockers]);
         }
 
-        $accessCode = DB::transaction(function () use ($registration): string {
+        // The registration number and access code were issued when the account
+        // was created, so submission only moves the status forward.
+        DB::transaction(function () use ($registration): void {
             $this->assertNotAlreadyRegistered($registration);
 
-            $number = $this->numbers->generate($registration->academicYear, $registration->wave);
-            $plainCode = $this->accessCodes->generate();
-
             $registration->forceFill([
-                'registration_number' => $number,
-                'access_code_hash' => $this->accessCodes->hash($plainCode),
                 'registration_status' => RegistrationStatus::Submitted,
                 'statement_agreed' => true,
                 'current_step' => 'review',
@@ -167,18 +230,14 @@ class RegistrationService
 
             $registration->refresh()->load(['academicYear', 'wave', 'admissionTrack', 'program']);
 
-            $this->pdf->generateReceipt($registration, $plainCode);
+            $this->pdf->generateReceipt($registration);
             $this->notifications->registrationSubmitted($registration);
-
-            return $plainCode;
         });
 
-        // Files were uploaded into the draft folder; move them under the
-        // registration number now that one exists. Done outside the
-        // transaction because filesystem moves cannot be rolled back.
+        // The number now exists from account creation, so uploads already land
+        // in the right folder and this is a no-op. Kept as a safety net for
+        // registrations created before the number moved to sign-up.
         $this->documents->relocateToRegistrationNumber($registration);
-
-        return $accessCode;
     }
 
     /**

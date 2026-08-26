@@ -154,12 +154,6 @@
                 <div class="credential-value">{{ $registration->registration_number }}</div>
             </div>
 
-            @if ($accessCode)
-                <div class="credential credential-warning" style="margin-top: 8px;">
-                    <div class="credential-label">Kode Akses</div>
-                    <div class="credential-value">{{ $accessCode }}</div>
-                </div>
-            @endif
         </td>
         <td class="qr">
             @if ($qrData)
@@ -242,15 +236,16 @@
         <td class="label">Cara Cek Status</td>
         <td class="sep">:</td>
         <td class="value">
-            Buka {{ route('status.form') }} lalu masukkan Nomor Pendaftaran dan Kode Akses.
+            Buka {{ route('login') }} lalu masukkan Nomor Pendaftaran dan Kode Akses.
         </td>
     </tr>
 </table>
 
 <div class="note">
-    <strong>Simpan kode akses dan bukti pendaftaran ini.</strong>
-    Kode akses diperlukan untuk mengecek status pendaftaran dan tidak dapat ditampilkan ulang oleh sistem.
-    Jangan membagikan kode akses kepada orang lain. Bila kode akses hilang, hubungi panitia
+    <strong>Simpan bukti pendaftaran ini.</strong>
+    Kode akses sengaja tidak dicetak di sini: bukti pendaftaran sering difotokopi dan
+    dititipkan, sehingga mencantumkannya akan membuka akses ke data pendaftaran Anda.
+    Gunakan kode akses yang Anda buat sendiri saat mendaftar. Bila lupa, hubungi panitia
     {{ $settings->admissionName() }} dengan membawa identitas diri untuk penerbitan ulang.
 </div>
 

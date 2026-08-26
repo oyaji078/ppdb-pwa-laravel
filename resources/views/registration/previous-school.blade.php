@@ -24,17 +24,22 @@
                            :options="config('ppdb.reference.school_statuses')" />
 
             <x-form.input name="npsn" label="NPSN" :value="$school?->npsn"
-                          inputmode="numeric" maxlength="8" hint="8 angka. Kosongkan bila tidak diketahui." />
+                          inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off"
+                          hint="8 angka. Kosongkan bila tidak diketahui." />
 
             <x-form.input name="nsm" label="NSM" :value="$school?->nsm" maxlength="20"
+                          inputmode="numeric" autocomplete="off"
                           hint="Diisi bila sekolah asal berupa madrasah." />
 
-            <x-form.input name="province" label="Provinsi Sekolah" :value="$school?->province" />
+            <x-form.input name="province" label="Provinsi Sekolah" :value="$school?->province"
+                          autocomplete="off" />
 
-            <x-form.input name="regency" label="Kabupaten/Kota Sekolah" :value="$school?->regency" />
+            <x-form.input name="regency" label="Kabupaten/Kota Sekolah" :value="$school?->regency"
+                          autocomplete="off" />
 
             <x-form.input name="graduation_year" type="number" label="Tahun Lulus" required
                           :value="$school?->graduation_year ?? now()->year"
+                          inputmode="numeric" step="1"
                           min="{{ now()->year - 15 }}" max="{{ now()->year + 1 }}" />
         </div>
 

@@ -20,6 +20,9 @@ class UserController extends Controller
     {
         return view('admin.users.index', [
             'users' => User::query()
+                // Applicant accounts are created by registering and are
+                // managed from the registration screens, not here.
+                ->whereNot('role', UserRole::Applicant)
                 ->when($request->filled('q'), fn ($q) => $q->where(
                     fn ($query) => $query->where('name', 'like', '%'.$request->string('q').'%')
                         ->orWhere('username', 'like', '%'.$request->string('q').'%')
@@ -29,7 +32,7 @@ class UserController extends Controller
                 ->orderBy('name')
                 ->paginate(15)
                 ->withQueryString(),
-            'roles' => UserRole::options(),
+            'roles' => UserRole::staffOptions(),
         ]);
     }
 
@@ -37,7 +40,7 @@ class UserController extends Controller
     {
         return view('admin.users.form', [
             'user' => new User(['role' => UserRole::Verifier, 'is_active' => true]),
-            'roles' => UserRole::options(),
+            'roles' => UserRole::staffOptions(),
         ]);
     }
 
@@ -48,7 +51,9 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email:rfc', 'max:150', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::enum(UserRole::class)],
+            // only(): an admin account screen must not be able to mint applicant
+            // logins, which belong to a registration.
+            'role' => ['required', Rule::enum(UserRole::class)->only(UserRole::staffCases())],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ]);
 
@@ -69,7 +74,7 @@ class UserController extends Controller
     {
         return view('admin.users.form', [
             'user' => $user,
-            'roles' => UserRole::options(),
+            'roles' => UserRole::staffOptions(),
         ]);
     }
 
@@ -80,7 +85,9 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email:rfc', 'max:150', Rule::unique('users', 'email')->ignore($user)],
             'phone' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::enum(UserRole::class)],
+            // only(): an admin account screen must not be able to mint applicant
+            // logins, which belong to a registration.
+            'role' => ['required', Rule::enum(UserRole::class)->only(UserRole::staffCases())],
             'password' => ['nullable', 'confirmed', Password::min(8)->letters()->numbers()],
         ]);
 

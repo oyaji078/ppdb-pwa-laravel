@@ -2,7 +2,7 @@
 
 @php
     $steps = [
-        ['key' => 'pendaftaran', 'label' => 'Data Pendaftaran', 'route' => 'registration.start'],
+        ['key' => 'pendaftaran', 'label' => 'Buat Akun', 'route' => 'registration.start'],
         ['key' => 'biodata', 'label' => 'Biodata', 'route' => 'registration.biodata'],
         ['key' => 'alamat', 'label' => 'Alamat', 'route' => 'registration.address'],
         ['key' => 'orang-tua', 'label' => 'Orang Tua/Wali', 'route' => 'registration.parents'],

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'applicant_id', 'relationship', 'name', 'nik', 'birth_year', 'education',
+    'applicant_id', 'relationship', 'name', 'nik', 'birth_date', 'education',
     'occupation', 'monthly_income', 'phone', 'address', 'is_alive',
 ])]
 class ParentGuardian extends Model
@@ -21,7 +21,7 @@ class ParentGuardian extends Model
     protected function casts(): array
     {
         return [
-            'birth_year' => 'integer',
+            'birth_date' => 'date',
             'is_alive' => 'boolean',
         ];
     }

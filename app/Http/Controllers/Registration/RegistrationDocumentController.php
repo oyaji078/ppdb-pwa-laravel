@@ -8,7 +8,7 @@ use App\Models\Registration;
 use App\Models\RegistrationDocument;
 use App\Services\DocumentService;
 use App\Services\RegistrationService;
-use App\Support\RegistrationDraft;
+use App\Support\ApplicantSession;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,14 +21,14 @@ use Illuminate\Validation\ValidationException;
 class RegistrationDocumentController extends Controller
 {
     public function __construct(
-        private readonly RegistrationDraft $draft,
+        private readonly ApplicantSession $session,
         private readonly DocumentService $documents,
         private readonly RegistrationService $registrations,
     ) {}
 
     public function index(): View|RedirectResponse
     {
-        $draft = $this->draft->current();
+        $draft = $this->currentDraft();
 
         if ($draft === null) {
             return $this->noDraft();
@@ -46,7 +46,7 @@ class RegistrationDocumentController extends Controller
 
     public function store(Request $request, DocumentType $documentType): RedirectResponse
     {
-        $draft = $this->draft->current();
+        $draft = $this->currentDraft();
 
         if ($draft === null) {
             return $this->noDraft();
@@ -69,7 +69,7 @@ class RegistrationDocumentController extends Controller
 
     public function destroy(RegistrationDocument $document): RedirectResponse
     {
-        $draft = $this->draft->current();
+        $draft = $this->currentDraft();
 
         if ($draft === null) {
             return $this->noDraft();
@@ -89,7 +89,7 @@ class RegistrationDocumentController extends Controller
      */
     public function preview(RegistrationDocument $document): Response|RedirectResponse
     {
-        $draft = $this->draft->current();
+        $draft = $this->currentDraft();
 
         if ($draft === null) {
             return $this->noDraft();
@@ -126,9 +126,29 @@ class RegistrationDocumentController extends Controller
         }
     }
 
+    /**
+     * The logged-in applicant's draft, or null once it has been submitted —
+     * uploads are only editable while the registration is still a draft.
+     */
+    private function currentDraft(): ?Registration
+    {
+        $registration = $this->session->registration();
+
+        if ($registration === null || ! $registration->isDraft()) {
+            return null;
+        }
+
+        return $registration->loadMissing(['admissionTrack', 'documents.documentType']);
+    }
+
     private function noDraft(): RedirectResponse
     {
-        return redirect()->route('registration.start')
-            ->with('warning', 'Sesi pendaftaran belum dimulai atau sudah berakhir. Silakan mulai dari langkah pertama.');
+        if ($this->session->check()) {
+            return redirect()->route('applicant.dashboard')
+                ->with('info', 'Pendaftaran Anda sudah dikirim. Berkas dikelola dari portal pendaftar.');
+        }
+
+        return redirect()->route('login')
+            ->with('warning', 'Sesi Anda telah berakhir. Silakan masuk kembali.');
     }
 }

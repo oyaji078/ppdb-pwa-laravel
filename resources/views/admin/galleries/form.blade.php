@@ -60,12 +60,22 @@
                                class="block w-full cursor-pointer rounded-lg text-sm text-slate-600 ring-1 ring-slate-300 ring-inset file:mr-3 file:cursor-pointer file:rounded-l-lg file:border-0 file:bg-slate-50 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-100">
                         <p class="mt-1 text-xs text-slate-500">JPG, PNG, atau WEBP. Maksimal 3 MB per foto, hingga 20 foto sekaligus.</p>
 
-                        @error('images')
+                        {{-- Per-file failures land on "images.0", "images.1", ... so a
+                             plain @error('images') would hide them. The wildcard lookup
+                             returns one array per key, hence the spread; identical
+                             messages across files are collapsed into one line. --}}
+                        @php
+                            $imageErrors = array_unique(array_merge(
+                                $errors->get('images'),
+                                ...array_values($errors->get('images.*'))
+                            ));
+                        @endphp
+                        @foreach ($imageErrors as $message)
                             <p class="form-error">
                                 <x-icon name="circle-alert" class="mt-px h-3.5 w-3.5 shrink-0" />
                                 <span>{{ $message }}</span>
                             </p>
-                        @enderror
+                        @endforeach
                     </div>
 
                     <div>

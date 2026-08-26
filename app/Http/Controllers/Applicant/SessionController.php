@@ -14,7 +14,7 @@ class SessionController extends Controller
     {
         $this->session->logout();
 
-        return redirect()->route('status.form')
+        return redirect()->route('login')
             ->with('success', 'Anda telah keluar dari portal pendaftar.');
     }
 }

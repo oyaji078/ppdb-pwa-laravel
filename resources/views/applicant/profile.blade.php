@@ -45,7 +45,7 @@
                 Pastikan Anda keluar setelah selesai, terutama bila menggunakan perangkat bersama.
             </p>
 
-            <form method="POST" action="{{ route('applicant.logout') }}" class="mt-4">
+            <form method="POST" action="{{ route('logout') }}" class="mt-4">
                 @csrf
                 <button type="submit" class="btn-danger">
                     <x-icon name="log-out" class="h-4 w-4" />

@@ -7,9 +7,15 @@ use App\Models\Registration;
 
 /**
  * Creates the applicant-facing notifications shown in the portal bell menu.
+ *
+ * Every notification funnels through push(), so mirroring it to e-mail there
+ * covers all statuses at once. The e-mail is best effort and never blocks the
+ * in-app notification from being stored.
  */
 class NotificationService
 {
+    public function __construct(private readonly ApplicantMailer $mailer) {}
+
     public function push(
         Registration $registration,
         string $type,
@@ -17,13 +23,17 @@ class NotificationService
         string $message,
         ?string $url = null,
     ): Notification {
-        return Notification::query()->create([
+        $notification = Notification::query()->create([
             'registration_id' => $registration->id,
             'type' => $type,
             'title' => $title,
             'message' => $message,
             'url' => $url,
         ]);
+
+        $this->mailer->sendStatusNotification($registration, $title, $message);
+
+        return $notification;
     }
 
     public function registrationSubmitted(Registration $registration): void

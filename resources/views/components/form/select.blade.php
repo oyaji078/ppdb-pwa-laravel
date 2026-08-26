@@ -9,7 +9,7 @@
 ])
 
 @php
-    $id = $attributes->get('id', $name);
+    $id = $attributes->get('id', str_replace('.', '_', $name));
     $errorId = $id.'-error';
     $hintId = $id.'-hint';
     $hasError = $errors->has($name);
@@ -28,12 +28,12 @@
     @endif
 
     <select
-        name="{{ $name }}"
+        name="{{ field_name($name) }}"
         id="{{ $id }}"
         @if ($required) required aria-required="true" @endif
         @if ($hasError) aria-invalid="true" @endif
         aria-describedby="{{ trim(($hasError ? $errorId.' ' : '').($hint ? $hintId : '')) ?: null }}"
-        {{ $attributes->merge(['class' => 'form-input'.($hasError ? ' ring-rose-400 focus:ring-rose-500' : '')]) }}
+        {{ $attributes->except('id')->merge(['class' => 'form-input'.($hasError ? ' ring-rose-400 focus:ring-rose-500' : '')]) }}
     >
         @if ($placeholder !== null)
             <option value="">{{ $placeholder }}</option>

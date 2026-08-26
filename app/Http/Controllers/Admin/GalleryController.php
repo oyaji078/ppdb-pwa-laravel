@@ -73,6 +73,12 @@ class GalleryController extends Controller
         ], [
             'images.required' => 'Pilih minimal satu foto.',
             'images.*.max' => 'Ukuran setiap foto maksimal 3 MB.',
+            'images.*.image' => 'Setiap berkas harus berupa gambar.',
+            'images.*.mimes' => 'Format foto harus JPG, PNG, atau WEBP.',
+            // Fires when PHP itself rejected the upload (upload_max_filesize /
+            // post_max_size), so Laravel never receives a usable file. The raw
+            // key would read "images.0", which means nothing to an operator.
+            'images.*.uploaded' => 'Foto gagal diunggah. Ukuran melebihi batas server, hubungi pengelola untuk menaikkan upload_max_filesize.',
         ]);
 
         $order = (int) $gallery->images()->max('sort_order');
@@ -108,7 +114,9 @@ class GalleryController extends Controller
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
         ]);
 
-        $validated['slug'] = Str::slug($validated['slug'] ?: $validated['title']) ?: 'album-'.now()->timestamp;
+        // The form has no slug field, so the key is absent rather than empty:
+        // "?:" alone would read an undefined index.
+        $validated['slug'] = Str::slug(($validated['slug'] ?? null) ?: $validated['title']) ?: 'album-'.now()->timestamp;
         $validated['is_published'] = $request->boolean('is_published');
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
 

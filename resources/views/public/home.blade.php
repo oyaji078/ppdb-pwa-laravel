@@ -4,7 +4,16 @@
 
 @section('hero')
     <section class="relative overflow-hidden bg-brand-700 text-white">
-        <div class="absolute inset-0 bg-gradient-to-br from-brand-700 via-brand-700 to-brand-900" aria-hidden="true"></div>
+        @if ($settings->heroBannerUrl())
+            {{-- Uploaded banner, with a scrim dark enough to keep the text
+                 readable whatever photo the school chose. --}}
+            <img src="{{ $settings->heroBannerUrl() }}" alt=""
+                 class="absolute inset-0 h-full w-full object-cover" aria-hidden="true">
+            <div class="absolute inset-0 bg-brand-950"
+                 style="opacity: {{ $settings->heroOverlayOpacity() }}" aria-hidden="true"></div>
+        @else
+            <div class="absolute inset-0 bg-gradient-to-br from-brand-700 via-brand-700 to-brand-900" aria-hidden="true"></div>
+        @endif
 
         <div class="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
             <div class="grid items-center gap-10 lg:grid-cols-2">
@@ -38,7 +47,7 @@
                             </span>
                         @endif
 
-                        <a href="{{ route('status.form') }}"
+                        <a href="{{ route('login') }}"
                            class="btn inline-flex bg-brand-600/40 px-6 py-3 text-base text-white ring-1 ring-white/30 ring-inset hover:bg-brand-600/60">
                             <x-icon name="search" class="h-5 w-5" />
                             Cek Status
@@ -46,22 +55,27 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="rounded-xl bg-white/10 p-5 ring-1 ring-white/20 ring-inset backdrop-blur">
-                        <p class="text-3xl font-bold">{{ number_format($registeredCount, 0, ',', '.') }}</p>
-                        <p class="mt-1 text-sm text-brand-100">Pendaftar tahun ini</p>
-                    </div>
-                    <div class="rounded-xl bg-white/10 p-5 ring-1 ring-white/20 ring-inset backdrop-blur">
-                        <p class="text-3xl font-bold">{{ $tracks->count() }}</p>
-                        <p class="mt-1 text-sm text-brand-100">Jalur pendaftaran</p>
-                    </div>
-                    <div class="rounded-xl bg-white/10 p-5 ring-1 ring-white/20 ring-inset backdrop-blur">
-                        <p class="text-3xl font-bold">{{ $openWaves->count() }}</p>
-                        <p class="mt-1 text-sm text-brand-100">Gelombang dibuka</p>
-                    </div>
-                    <div class="rounded-xl bg-white/10 p-5 ring-1 ring-white/20 ring-inset backdrop-blur">
-                        <p class="text-3xl font-bold">{{ $facilities->count() }}</p>
-                        <p class="mt-1 text-sm text-brand-100">Fasilitas sekolah</p>
+                <div class="space-y-4">
+                    <x-applicant-login-box />
+
+                    {{-- Stats compact under the login card so the hero keeps both. --}}
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="rounded-lg bg-white/10 p-3 text-center ring-1 ring-white/20 ring-inset backdrop-blur">
+                            <p class="text-xl font-bold">{{ number_format($registeredCount, 0, ',', '.') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-100">Pendaftar</p>
+                        </div>
+                        <div class="rounded-lg bg-white/10 p-3 text-center ring-1 ring-white/20 ring-inset backdrop-blur">
+                            <p class="text-xl font-bold">{{ $tracks->count() }}</p>
+                            <p class="mt-0.5 text-xs text-brand-100">Jalur</p>
+                        </div>
+                        <div class="rounded-lg bg-white/10 p-3 text-center ring-1 ring-white/20 ring-inset backdrop-blur">
+                            <p class="text-xl font-bold">{{ $openWaves->count() }}</p>
+                            <p class="mt-0.5 text-xs text-brand-100">Gelombang</p>
+                        </div>
+                        <div class="rounded-lg bg-white/10 p-3 text-center ring-1 ring-white/20 ring-inset backdrop-blur">
+                            <p class="text-xl font-bold">{{ $facilities->count() }}</p>
+                            <p class="mt-0.5 text-xs text-brand-100">Fasilitas</p>
+                        </div>
                     </div>
                 </div>
             </div>

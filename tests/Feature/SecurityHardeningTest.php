@@ -28,18 +28,18 @@ class SecurityHardeningTest extends TestCase
         $this->createPpdbConfiguration();
 
         $this->get(route('registration.start'))->assertHeaderContains('Cache-Control', 'no-store');
-        $this->get(route('status.form'))->assertHeaderContains('Cache-Control', 'no-store');
+        $this->get(route('login'))->assertHeaderContains('Cache-Control', 'no-store');
     }
 
     public function test_forms_carry_a_csrf_token(): void
     {
         $this->createPpdbConfiguration();
 
-        $this->get(route('status.form'))
+        $this->get(route('login'))
             ->assertOk()
             ->assertSee('name="_token"', false);
 
-        $this->get(route('admin.login'))
+        $this->get(route('login'))
             ->assertOk()
             ->assertSee('name="_token"', false);
     }
@@ -87,16 +87,16 @@ class SecurityHardeningTest extends TestCase
             ->assertSee('5203010101100066');
     }
 
-    public function test_the_access_code_hash_is_hidden_from_model_serialisation(): void
+    public function test_the_password_hash_is_hidden_from_model_serialisation(): void
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
         $registration = $this->createSubmittableDraft($config);
         app(RegistrationService::class)->submit($registration, statementAgreed: true);
 
-        $serialised = $registration->fresh()->toArray();
-
-        $this->assertArrayNotHasKey('access_code_hash', $serialised);
+        $this->assertArrayNotHasKey('access_code_hash', $registration->fresh()->toArray());
+        $this->assertArrayNotHasKey('password', $registration->fresh()->user->toArray());
+        $this->assertArrayNotHasKey('remember_token', $registration->fresh()->user->toArray());
     }
 
     public function test_the_private_disk_has_no_public_url(): void
@@ -150,6 +150,11 @@ class SecurityHardeningTest extends TestCase
         $this->assertStringStartsWith('$2y$', $admin->password);
     }
 
+    /**
+     * Everyone signs in through one form, so the separation between an applicant
+     * and the admin panel is the role check — a signed-in applicant is refused,
+     * not redirected to sign in again.
+     */
     public function test_the_admin_area_rejects_an_applicant_session(): void
     {
         $this->fakePrivateDisk();
@@ -157,16 +162,22 @@ class SecurityHardeningTest extends TestCase
         $registration = $this->createSubmittableDraft($config);
         app(RegistrationService::class)->submit($registration, statementAgreed: true);
 
-        // An applicant session must never satisfy an admin route.
         $this->actingAsApplicant($registration->fresh())
             ->get(route('admin.dashboard'))
-            ->assertRedirect(route('admin.login'));
+            ->assertForbidden();
     }
 
     public function test_an_admin_session_does_not_grant_the_applicant_portal(): void
     {
         $this->actingAs($this->createAdmin())
             ->get(route('applicant.dashboard'))
-            ->assertRedirect(route('status.form'));
+            ->assertForbidden();
+    }
+
+    public function test_a_guest_is_still_sent_to_the_single_sign_in(): void
+    {
+        $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
+        $this->get(route('applicant.dashboard'))->assertRedirect(route('login'));
+        $this->get(route('registration.biodata'))->assertRedirect(route('login'));
     }
 }

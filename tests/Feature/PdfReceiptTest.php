@@ -6,6 +6,7 @@ use App\Models\GeneratedDocument;
 use App\Models\Registration;
 use App\Services\PdfService;
 use App\Services\RegistrationService;
+use App\Support\SettingsRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -50,6 +51,28 @@ class PdfReceiptTest extends TestCase
         $this->assertStringStartsWith('ppdb/', $receipt->storage_path);
         $this->assertFalse(Storage::disk('public')->exists($receipt->storage_path));
         $this->get('/storage/'.$receipt->storage_path)->assertNotFound();
+    }
+
+    /**
+     * A receipt is photocopied and handed around, so printing the access code on
+     * it would hand over portal access along with it.
+     */
+    public function test_the_receipt_carries_the_number_but_never_the_access_code(): void
+    {
+        $registration = $this->submitted();
+
+        $html = view('pdf.registration-receipt', [
+            'registration' => $registration,
+            'applicant' => $registration->applicant,
+            'settings' => app(SettingsRepository::class),
+            'logoData' => null,
+            'qrData' => null,
+            'documents' => $registration->applicableDocumentTypes(),
+        ])->render();
+
+        $this->assertStringContainsString($registration->registration_number, $html);
+        $this->assertStringNotContainsString(self::ACCESS_CODE, $html);
+        $this->assertStringNotContainsString('Kode Akses</div>', $html);
     }
 
     public function test_the_qr_code_points_at_the_status_page_without_the_access_code(): void
@@ -110,8 +133,8 @@ class PdfReceiptTest extends TestCase
     {
         $registration = $this->submitted();
 
-        $this->get(route('applicant.receipt'))->assertRedirect(route('status.form'));
-        $this->get(route('admin.registrations.receipt', $registration))->assertRedirect(route('admin.login'));
+        $this->get(route('applicant.receipt'))->assertRedirect(route('login'));
+        $this->get(route('admin.registrations.receipt', $registration))->assertRedirect(route('login'));
     }
 
     public function test_the_receipt_records_a_checksum_of_its_contents(): void

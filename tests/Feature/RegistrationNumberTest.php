@@ -66,9 +66,10 @@ class RegistrationNumberTest extends TestCase
         $first = $this->createSubmittableDraft($config);
         $service->submit($first, statementAgreed: true);
 
-        $second = $this->createSubmittableDraft($config);
-        $second->update(['registration_wave_id' => $waveTwo->id]);
-        $service->submit($second->fresh(), statementAgreed: true);
+        // The wave is fixed when the account is opened, because that is when
+        // the number is drawn from that wave's counter.
+        $second = $this->createSubmittableDraft(array_merge($config, ['wave' => $waveTwo]));
+        $service->submit($second, statementAgreed: true);
 
         $this->assertSame('2601000001', $first->fresh()->registration_number);
         $this->assertSame('2602000001', $second->fresh()->registration_number);

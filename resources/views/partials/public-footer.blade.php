@@ -32,7 +32,7 @@
                     <li><a href="{{ route('ppdb.schedule') }}" class="hover:text-white">Jadwal</a></li>
                     <li><a href="{{ route('ppdb.requirements') }}" class="hover:text-white">Persyaratan</a></li>
                     <li><a href="{{ route('downloads.index') }}" class="hover:text-white">Unduhan</a></li>
-                    <li><a href="{{ route('status.form') }}" class="hover:text-white">Cek Status Pendaftaran</a></li>
+                    <li><a href="{{ route('login') }}" class="hover:text-white">Masuk / Cek Status</a></li>
                 </ul>
             </div>
 
@@ -71,7 +71,8 @@
 
         <div class="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-800 pt-6 text-xs text-slate-500 sm:flex-row">
             <p>&copy; {{ now()->year }} {{ $settings->schoolName() }}. Seluruh hak cipta dilindungi.</p>
-            <a href="{{ route('admin.login') }}" class="hover:text-slate-300">Login Panitia</a>
+            {{-- One sign-in serves everyone now, so this is no longer staff-only. --}}
+            <a href="{{ route('login') }}" class="hover:text-slate-300">Masuk</a>
         </div>
     </div>
 </footer>

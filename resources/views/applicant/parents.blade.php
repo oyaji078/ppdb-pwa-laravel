@@ -14,7 +14,8 @@
                 <x-review-section :title="'Data '.$parent->relationshipLabel()">
                     <x-review-item label="Nama Lengkap" :value="$parent->name" wide />
                     <x-review-item label="NIK" :value="mask_identity_number($parent->nik)" />
-                    <x-review-item label="Tahun Lahir" :value="$parent->birth_year" />
+                    <x-review-item label="Tanggal Lahir"
+                               :value="$parent->birth_date?->translatedFormat('d F Y')" />
                     <x-review-item label="Pendidikan Terakhir" :value="$parent->education" />
                     <x-review-item label="Pekerjaan" :value="$parent->occupation" />
                     <x-review-item label="Penghasilan per Bulan" :value="$parent->monthly_income" />

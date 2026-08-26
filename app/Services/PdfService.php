@@ -28,10 +28,11 @@ class PdfService
     /**
      * Build the receipt PDF and record it in generated_documents.
      *
-     * @param  string|null  $accessCode  Plaintext code, available only at the
-     *                                   moment of submission or a reset.
+     * The receipt deliberately carries the registration number only. Applicants
+     * choose their own access code at sign-up, and a receipt gets photocopied
+     * and handed around, so printing the code on it would leak portal access.
      */
-    public function generateReceipt(Registration $registration, ?string $accessCode = null): GeneratedDocument
+    public function generateReceipt(Registration $registration): GeneratedDocument
     {
         $registration->loadMissing([
             'applicant.address', 'applicant.parentGuardians', 'applicant.previousSchool',
@@ -42,7 +43,6 @@ class PdfService
         $pdf = Pdf::loadView('pdf.registration-receipt', [
             'registration' => $registration,
             'applicant' => $registration->applicant,
-            'accessCode' => $accessCode,
             'settings' => $this->settings,
             'logoData' => $this->logoDataUri(),
             'qrData' => $this->qrDataUri($registration),

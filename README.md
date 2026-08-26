@@ -30,6 +30,7 @@ ditanam di kode dan sepenuhnya diatur dari menu **Pengaturan**.
 16. [Struktur Kode](#16-struktur-kode)
 17. [Deploy ke Produksi](#17-deploy-ke-produksi)
 18. [Pemecahan Masalah](#18-pemecahan-masalah)
+19. [Email](#19-email)
 
 ---
 
@@ -203,7 +204,7 @@ CREATE DATABASE ppdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'ppdb'@'localhost' IDENTIFIED BY 'kata-sandi-yang-kuat';
 GRANT ALL PRIVILEGES ON ppdb.* TO 'ppdb'@'localhost';
 FLUSH PRIVILEGES;
-```
+``` 
 
 `.env`:
 
@@ -344,13 +345,13 @@ pendaftaran langsung bisa dicoba. Sesuaikan tanggal sebenarnya dari menu
 php artisan db:seed --class=DemoSeeder
 ```
 
-Menambah 12 pendaftar contoh pada berbagai tahap, dua akun panitia
+Menambah 20 pendaftar contoh pada berbagai tahap, dua akun panitia
 (`admin.ppdb` dan `verifikator`, kata sandi `Demo#12345`), berita, album, dan
 pengumuman. Seeder ini menolak berjalan bila `APP_ENV=production`.
 
-Kode akses pendaftar contoh dibuat acak dan hanya disimpan sebagai hash,
-sehingga tidak dapat dilihat. Untuk mencoba portal pendaftar, daftar sendiri
-lewat `/daftar` atau gunakan **Reset Kode Akses** pada detail pendaftar.
+Seluruh pendaftar contoh memakai kode akses `Demo#12345` agar portal pendaftar
+dapat langsung dicoba, dan email mereka ditandai sudah terverifikasi. Pendaftar
+sungguhan memilih kode aksesnya sendiri saat membuat akun.
 
 ### 6.3 Menjalankan ulang satu seeder
 
@@ -504,8 +505,42 @@ dipakai sungguhan.
 
 ### Calon peserta didik
 
-**http://localhost:8000/cek-status** — masuk dengan **nomor pendaftaran + kode
-akses** yang diperoleh setelah mengirim formulir. Tidak ada username/password.
+Mendaftar di **http://localhost:8000/daftar** — akun dibuat lebih dulu, dan
+nomor pendaftaran langsung diterbitkan di situ.
+
+Masuk lewat halaman yang sama seperti panitia. Masuk sebagai draft mengembalikan
+pendaftar ke langkah formulir terakhirnya; masuk setelah mengirim membuka portal
+pendaftar.
+
+Pendaftar contoh dari `DemoSeeder` memakai email `ahmad0@example.test` sampai
+`hanifah19@example.test` dengan kata sandi `Demo#12345`, bernomor `2701000001`
+sampai `2701000020`.
+
+### Satu login untuk semua peran
+
+**http://localhost:8000/masuk** — satu formulir untuk pendaftar, verifikator,
+Admin PPDB, dan Super Admin. Tidak ada halaman login terpisah.
+
+| Yang diisi | Keterangan |
+| --- | --- |
+| Email | Wajib. Panitia juga boleh mengetik nama penggunanya |
+| Kata sandi | Peka huruf besar dan kecil |
+
+Setelah masuk, **peran** yang menentukan tujuan dan hak akses:
+
+| Peran | Mendarat di | Akses |
+| --- | --- | --- |
+| `applicant` | Formulir (bila draft) atau portal pendaftar | Hanya `/daftar/*` dan `/pendaftar/*` |
+| `verifier` | Panel admin | Verifikasi berkas |
+| `admin_ppdb` | Panel admin | Konfigurasi, konten, seleksi, daftar ulang |
+| `super_admin` | Panel admin | Seluruh menu, akun admin, pengaturan |
+
+Peran yang salah alamat menerima **403**, bukan diarahkan ke login lagi — pemisahan
+dilakukan oleh RBAC, bukan oleh login yang berbeda-beda. Tamu tetap diarahkan ke
+`/masuk`. URL lama `/admin/login` dan `/cek-status` otomatis dialihkan ke sana.
+
+Akun pendaftar dibuat lewat pendaftaran, bukan dari menu **Admin**; menu itu hanya
+mengelola akun panitia.
 
 ---
 
@@ -562,9 +597,11 @@ permanen pendaftar hanya tersedia bagi super admin.
 ## 11. Alur Sistem
 
 ```
-Website publik → Formulir 8 langkah → Kirim
+Website publik → Buat akun (gelombang, jalur, nama, NISN, HP, email, kode akses)
     ↓ (satu transaksi database)
-Nomor pendaftaran 10 digit + kode akses 8 karakter + PDF bukti pendaftaran
+Nomor pendaftaran 10 digit + kode akses tersimpan + email verifikasi terkirim
+    ↓ (pendaftar otomatis masuk)
+Formulir 7 langkah → Kirim → PDF bukti pendaftaran (nomor saja)
     ↓
 Portal pendaftar (nomor + kode akses)
     ↓
@@ -574,6 +611,12 @@ Seleksi (draft) → Publikasi → hasil terlihat pendaftar
     ↓
 Daftar ulang → Laporan
 ```
+
+Pendaftar **membuat akun lebih dulu**, lalu mengisi formulir dalam keadaan sudah
+masuk. Formulir dapat ditinggalkan kapan saja dan dilanjutkan dengan masuk
+kembali — tidak lagi bergantung pada sesi browser yang sama.
+
+Kotak login tersedia di beranda, selain pada halaman `/cek-status`.
 
 ### Nomor pendaftaran
 
@@ -585,21 +628,41 @@ Format 10 digit `YYGGNNNNNN`:
 | `GG` | Dua digit kode gelombang | `01` |
 | `NNNNNN` | Nomor urut per gelombang | `000128` |
 
-Nomor dibuat **hanya saat final submit**, di dalam transaksi database, memakai
-baris penghitung terkunci. Tidak memakai `MAX()+1`, sehingga dua pengiriman
-bersamaan tidak mungkin memperoleh nomor sama. Menghapus pendaftar tidak
-membuat nomornya dipakai ulang.
+Nomor dibuat **saat akun dibuat**, di dalam transaksi database, memakai baris
+penghitung terkunci. Tidak memakai `MAX()+1`, sehingga dua pendaftaran bersamaan
+tidak mungkin memperoleh nomor sama. Menghapus pendaftar tidak membuat nomornya
+dipakai ulang.
 
-### Kode akses
+> Konsekuensi: akun yang dibuat lalu ditinggalkan **tetap memakai satu nomor
+> urut**, sehingga nomor pendaftar yang benar-benar mengirim formulir tidak
+> berurutan rapat. Bersihkan dengan `php artisan ppdb:prune-drafts`.
 
-Delapan karakter dari alfabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (tanpa `0`,
-`O`, `1`, `I` agar tidak ambigu saat dicetak). Database hanya menyimpan
-hash-nya; kode asli ditampilkan **satu kali** pada halaman sukses dan pada PDF
-bukti pendaftaran.
+Gelombang tidak dapat diubah setelah akun dibuat, karena nomor sudah diambil
+dari penghitung gelombang tersebut.
 
-Panitia pun tidak dapat membacanya kembali. Bila hilang, panitia menerbitkan
-kode baru lewat **Reset Kode Akses**, yang sekaligus menghentikan seluruh sesi
-lama pendaftar tersebut dan tercatat pada activity log.
+### Kata sandi pendaftar
+
+Pendaftar memilih sendiri kata sandinya saat membuat akun (minimal 8 karakter).
+Akunnya adalah baris `users` biasa dengan peran `applicant`, sehingga kata sandi
+tersimpan di `users.password` seperti akun panitia.
+
+- **Masuk memakai email + kata sandi**, bukan nomor pendaftaran.
+- **Peka huruf besar dan kecil.** `Rahasia123` berbeda dari `rahasia123`.
+- **Tidak dicetak pada bukti pendaftaran.** Bukti sering difotokopi dan
+  dititipkan; mencantumkan kata sandi berarti menyerahkan akses portal.
+- Email harus unik di seluruh sistem, karena itulah identitas login. Dua anak
+  dalam satu keluarga memerlukan dua alamat email berbeda.
+- Bila lupa, panitia menerbitkan kata sandi sementara lewat **Reset Kode Akses**
+  pada detail pendaftar. Kata sandi lama langsung tidak berlaku, seluruh sesi
+  pendaftar tersebut berakhir, dan tindakan itu tercatat di activity log. Kata
+  sandi hasil reset dibuat sistem dengan huruf kapital dan harus diketik persis.
+
+### Verifikasi email
+
+Saat akun dibuat, sistem mengirim tautan verifikasi bertanda tangan yang berlaku
+7 hari. Pendaftar tetap dapat mengisi formulir tanpa menunggu verifikasi;
+verifikasi baru menjadi syarat mengirim formulir bila panitia menyalakan
+**Wajibkan verifikasi email** pada Pengaturan. Lihat [bagian 19](#19-email).
 
 ---
 
@@ -794,6 +857,7 @@ konfigurasi masih ter-cache.
 
 ---
 
+
 ## 18. Pemecahan Masalah
 
 | Gejala | Penyebab dan solusi |
@@ -811,6 +875,56 @@ konfigurasi masih ter-cache.
 | QR Code tidak muncul di PDF | Ekstensi `gd` belum aktif |
 | Ekspor XLSX gagal | Ekstensi `zip` belum aktif |
 | Tanggal tampil dalam Bahasa Inggris | Ekstensi `intl` belum aktif, atau `APP_LOCALE` bukan `id` |
+| Email tidak terkirim | Aktifkan pada Pengaturan → Email (SMTP), lalu pakai tombol **Kirim Email Uji**; pesan galat aslinya ditampilkan |
+| Pendaftar tidak menerima email status | Emailnya belum diverifikasi — email status hanya dikirim ke alamat terverifikasi |
+| Kode akses ditolak padahal benar | Kode akses peka huruf besar/kecil sejak pendaftar memilihnya sendiri |
+| Tidak bisa daftar, NISN sudah punya akun | Akun sudah pernah dibuat; masuk lewat kotak login, atau minta panitia **Reset Kode Akses** |
 | `php` tidak dikenali di PowerShell | PHP belum ada di PATH, lihat [bagian 8](#8-menjalankan-aplikasi) |
 
 Log aplikasi ada di `storage/logs/laravel.log`.
+
+## 19. Email
+
+Verifikasi email pendaftar dan pemberitahuan perubahan status dikirim lewat SMTP
+yang dikonfigurasi dari **Panel Admin → Pengaturan → Email (SMTP)**, bukan dari
+`.env`. Nilai di sini menimpa konfigurasi `.env` saat aplikasi berjalan, sehingga
+pengaturan yang sama berlaku baik di komputer lokal maupun setelah hosting, dan
+sekolah dapat berpindah penyedia email tanpa menyentuh berkas.
+
+Hanya **Super Admin** yang dapat membukanya.
+
+| Kolom | Keterangan |
+| --- | --- |
+| Aktifkan pengiriman email | Bila mati, sistem berjalan normal tanpa mengirim email apa pun |
+| Wajibkan verifikasi email | Pendaftar tetap bisa mengisi formulir, tetapi tidak bisa mengirimnya sebelum email terverifikasi |
+| Metode Pengiriman | `SMTP` untuk server sungguhan, `Log` untuk uji coba (email ditulis ke `storage/logs`) |
+| Host, Port, Enkripsi | Umumnya `587` + TLS, atau `465` + SSL |
+| Username, Kata Sandi SMTP | Kata sandi disimpan **terenkripsi** dan tidak pernah ditampilkan kembali. Kosongkan bila tidak ingin mengubah |
+| Email & Nama Pengirim | Kosongkan untuk memakai email dan nama sekolah |
+
+Setelah menyimpan, gunakan **Uji Coba Pengiriman Email** di bagian bawah halaman.
+Bila gagal, pesan asli dari server email ditampilkan apa adanya — misalnya
+`Connection could not be established with host` bila host atau port salah.
+
+### Mencoba tanpa server email
+
+Pilih metode **Log**. Email tidak dikirim ke mana pun, melainkan ditulis lengkap
+ke `storage/logs/laravel-YYYY-MM-DD.log` sehingga isinya dapat diperiksa.
+
+### Yang dikirim
+
+| Kejadian | Penerima |
+| --- | --- |
+| Akun pendaftaran dibuat | Tautan verifikasi, berlaku 7 hari |
+| Email diubah di langkah Biodata | Tautan verifikasi baru; verifikasi lama dibatalkan |
+| Setiap pemberitahuan status | Pendaftar dengan email **sudah terverifikasi** |
+
+Pemberitahuan status menumpang pada notifikasi portal, jadi seluruh kejadian —
+berkas perlu perbaikan, verifikasi selesai, hasil seleksi terbit, daftar ulang —
+otomatis ikut terkirim lewat email.
+
+Kegagalan pengiriman tidak pernah menggagalkan pendaftaran: kesalahan dicatat ke
+log lalu diabaikan, sehingga SMTP yang salah konfigurasi tidak membuat sekolah
+kehilangan pendaftar.
+
+---

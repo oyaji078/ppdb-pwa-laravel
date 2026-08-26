@@ -5,7 +5,6 @@ use App\Http\Controllers\Admin\AccessCodeController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AdmissionTrackController;
 use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
-use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\Admin\DownloadController as AdminDownloadController;
@@ -32,6 +31,7 @@ use App\Http\Controllers\Applicant\NotificationController;
 use App\Http\Controllers\Applicant\ProfileController as ApplicantProfileController;
 use App\Http\Controllers\Applicant\ReceiptController;
 use App\Http\Controllers\Applicant\SessionController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Public\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\Public\DownloadController;
 use App\Http\Controllers\Public\GalleryController;
@@ -40,9 +40,9 @@ use App\Http\Controllers\Public\NewsController;
 use App\Http\Controllers\Public\PageController;
 use App\Http\Controllers\Public\PpdbInfoController;
 use App\Http\Controllers\PwaController;
+use App\Http\Controllers\Registration\AccountController as RegistrationAccountController;
 use App\Http\Controllers\Registration\RegistrationDocumentController;
 use App\Http\Controllers\Registration\RegistrationWizardController;
-use App\Http\Controllers\StatusCheckController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -96,34 +96,48 @@ Route::get('/offline', [PwaController::class, 'offline'])->name('pwa.offline');
 // no-store: the wizard holds personal data in progress, so neither the browser
 // nor the service worker should retain these pages.
 Route::prefix('daftar')->name('registration.')->middleware('no-store')->group(function (): void {
-    Route::get('/', [RegistrationWizardController::class, 'start'])->name('start');
-    Route::post('/', [RegistrationWizardController::class, 'storeStart'])->name('start.store');
+    // Step zero is public: opening the account issues the registration number
+    // and the access code the rest of the flow authenticates with.
+    Route::get('/', [RegistrationAccountController::class, 'create'])->name('start');
+    Route::post('/', [RegistrationAccountController::class, 'store'])->name('start.store');
 
-    Route::get('/biodata', [RegistrationWizardController::class, 'biodata'])->name('biodata');
-    Route::post('/biodata', [RegistrationWizardController::class, 'storeBiodata'])->name('biodata.store');
+    Route::get('/verifikasi-email/{registration}', [RegistrationAccountController::class, 'verifyEmail'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('email.verify');
 
-    Route::get('/alamat', [RegistrationWizardController::class, 'address'])->name('address');
-    Route::post('/alamat', [RegistrationWizardController::class, 'storeAddress'])->name('address.store');
+    // Everything below is the form itself, which requires a signed-in applicant.
+    Route::middleware(['auth', 'active', 'role:applicant'])->group(function (): void {
+        Route::get('/lanjutkan', [RegistrationWizardController::class, 'resume'])->name('resume');
+        Route::post('/kirim-ulang-verifikasi', [RegistrationAccountController::class, 'resendVerification'])
+            ->middleware('throttle:6,1')
+            ->name('email.resend');
 
-    Route::get('/orang-tua', [RegistrationWizardController::class, 'parents'])->name('parents');
-    Route::post('/orang-tua', [RegistrationWizardController::class, 'storeParents'])->name('parents.store');
+        Route::get('/biodata', [RegistrationWizardController::class, 'biodata'])->name('biodata');
+        Route::post('/biodata', [RegistrationWizardController::class, 'storeBiodata'])->name('biodata.store');
 
-    Route::get('/asal-sekolah', [RegistrationWizardController::class, 'previousSchool'])->name('previous-school');
-    Route::post('/asal-sekolah', [RegistrationWizardController::class, 'storePreviousSchool'])->name('previous-school.store');
+        Route::get('/alamat', [RegistrationWizardController::class, 'address'])->name('address');
+        Route::post('/alamat', [RegistrationWizardController::class, 'storeAddress'])->name('address.store');
 
-    Route::get('/program', [RegistrationWizardController::class, 'program'])->name('program');
-    Route::post('/program', [RegistrationWizardController::class, 'storeProgram'])->name('program.store');
+        Route::get('/orang-tua', [RegistrationWizardController::class, 'parents'])->name('parents');
+        Route::post('/orang-tua', [RegistrationWizardController::class, 'storeParents'])->name('parents.store');
 
-    Route::get('/berkas', [RegistrationDocumentController::class, 'index'])->name('documents');
-    Route::post('/berkas/{documentType}', [RegistrationDocumentController::class, 'store'])->name('documents.store');
-    Route::delete('/berkas/{document}', [RegistrationDocumentController::class, 'destroy'])->name('documents.destroy');
-    Route::get('/berkas/{document}/pratinjau', [RegistrationDocumentController::class, 'preview'])->name('documents.preview');
+        Route::get('/asal-sekolah', [RegistrationWizardController::class, 'previousSchool'])->name('previous-school');
+        Route::post('/asal-sekolah', [RegistrationWizardController::class, 'storePreviousSchool'])->name('previous-school.store');
 
-    Route::get('/review', [RegistrationWizardController::class, 'review'])->name('review');
-    Route::post('/kirim', [RegistrationWizardController::class, 'submit'])->name('submit');
+        Route::get('/program', [RegistrationWizardController::class, 'program'])->name('program');
+        Route::post('/program', [RegistrationWizardController::class, 'storeProgram'])->name('program.store');
 
-    Route::get('/selesai', [RegistrationWizardController::class, 'success'])->name('success');
-    Route::get('/selesai/bukti', [RegistrationWizardController::class, 'downloadReceipt'])->name('success.receipt');
+        Route::get('/berkas', [RegistrationDocumentController::class, 'index'])->name('documents');
+        Route::post('/berkas/{documentType}', [RegistrationDocumentController::class, 'store'])->name('documents.store');
+        Route::delete('/berkas/{document}', [RegistrationDocumentController::class, 'destroy'])->name('documents.destroy');
+        Route::get('/berkas/{document}/pratinjau', [RegistrationDocumentController::class, 'preview'])->name('documents.preview');
+
+        Route::get('/review', [RegistrationWizardController::class, 'review'])->name('review');
+        Route::post('/kirim', [RegistrationWizardController::class, 'submit'])->name('submit');
+
+        Route::get('/selesai', [RegistrationWizardController::class, 'success'])->name('success');
+        Route::get('/selesai/bukti', [RegistrationWizardController::class, 'downloadReceipt'])->name('success.receipt');
+    });
 });
 
 /*
@@ -132,37 +146,43 @@ Route::prefix('daftar')->name('registration.')->middleware('no-store')->group(fu
 |--------------------------------------------------------------------------
 */
 
-Route::get('/cek-status', [StatusCheckController::class, 'form'])
-    ->middleware('no-store')
-    ->name('status.form');
-Route::post('/cek-status', [StatusCheckController::class, 'authenticate'])
-    ->middleware(['no-store', 'throttle:status-check'])
-    ->name('status.authenticate');
+// One sign-in for applicants, verifiers, PPDB admins and super admins.
+Route::get('/masuk', [LoginController::class, 'show'])->middleware(['guest', 'no-store'])->name('login');
+Route::post('/masuk', [LoginController::class, 'store'])
+    ->middleware(['guest', 'no-store', 'throttle:login'])
+    ->name('login.store');
+Route::post('/keluar', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
 
-Route::prefix('pendaftar')->name('applicant.')->middleware(['applicant', 'no-store'])->group(function (): void {
-    Route::get('/dashboard', [ApplicantDashboardController::class, 'index'])->name('dashboard');
+// Kept so the receipt QR code, printed material and old bookmarks still land
+// somewhere sensible.
+Route::get('/cek-status', fn () => redirect()->route('login'))->name('status.form');
 
-    Route::get('/biodata', [ApplicantProfileController::class, 'biodata'])->name('biodata');
-    Route::get('/orang-tua', [ApplicantProfileController::class, 'parents'])->name('parents');
-    Route::get('/asal-sekolah', [ApplicantProfileController::class, 'previousSchool'])->name('previous-school');
-    Route::get('/program', [ApplicantProfileController::class, 'program'])->name('program');
-    Route::get('/profil', [ApplicantProfileController::class, 'profile'])->name('profile');
+Route::prefix('pendaftar')->name('applicant.')
+    ->middleware(['auth', 'active', 'role:applicant', 'no-store'])
+    ->group(function (): void {
+        Route::get('/dashboard', [ApplicantDashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/berkas', [ApplicantDocumentController::class, 'index'])->name('documents.index');
-    Route::post('/berkas/{documentType}', [ApplicantDocumentController::class, 'store'])->name('documents.store');
-    Route::get('/berkas/{document}/pratinjau', [ApplicantDocumentController::class, 'preview'])->name('documents.preview');
-    Route::get('/berkas/{document}/unduh', [ApplicantDocumentController::class, 'download'])->name('documents.download');
+        Route::get('/biodata', [ApplicantProfileController::class, 'biodata'])->name('biodata');
+        Route::get('/orang-tua', [ApplicantProfileController::class, 'parents'])->name('parents');
+        Route::get('/asal-sekolah', [ApplicantProfileController::class, 'previousSchool'])->name('previous-school');
+        Route::get('/program', [ApplicantProfileController::class, 'program'])->name('program');
+        Route::get('/profil', [ApplicantProfileController::class, 'profile'])->name('profile');
 
-    Route::get('/pengumuman', [ApplicantAnnouncementController::class, 'index'])->name('announcements.index');
-    Route::get('/pengumuman/{announcement:slug}', [ApplicantAnnouncementController::class, 'show'])->name('announcements.show');
+        Route::get('/berkas', [ApplicantDocumentController::class, 'index'])->name('documents.index');
+        Route::post('/berkas/{documentType}', [ApplicantDocumentController::class, 'store'])->name('documents.store');
+        Route::get('/berkas/{document}/pratinjau', [ApplicantDocumentController::class, 'preview'])->name('documents.preview');
+        Route::get('/berkas/{document}/unduh', [ApplicantDocumentController::class, 'download'])->name('documents.download');
 
-    Route::get('/bukti-pendaftaran', [ReceiptController::class, 'download'])->name('receipt');
+        Route::get('/pengumuman', [ApplicantAnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('/pengumuman/{announcement:slug}', [ApplicantAnnouncementController::class, 'show'])->name('announcements.show');
 
-    Route::post('/notifikasi/{notification}/baca', [NotificationController::class, 'markAsRead'])->name('notifications.read');
-    Route::post('/notifikasi/baca-semua', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+        Route::get('/bukti-pendaftaran', [ReceiptController::class, 'download'])->name('receipt');
 
-    Route::post('/keluar', [SessionController::class, 'logout'])->name('logout');
-});
+        Route::post('/notifikasi/{notification}/baca', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::post('/notifikasi/baca-semua', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+
+        Route::post('/keluar', [SessionController::class, 'logout'])->name('logout');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -171,16 +191,12 @@ Route::prefix('pendaftar')->name('applicant.')->middleware(['applicant', 'no-sto
 */
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
-    Route::middleware('guest')->group(function (): void {
-        Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-        Route::post('/login', [AuthController::class, 'login'])
-            ->middleware('throttle:admin-login')
-            ->name('login.store');
-    });
+    // The admin panel no longer has a sign-in of its own; this keeps old links
+    // and bookmarks working.
+    Route::get('/login', fn () => redirect()->route('login'))->middleware('guest')->name('login');
 
-    Route::middleware(['auth', 'active', 'no-store'])->group(function (): void {
-        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
+    // Applicants authenticate here too, so the whole panel is role gated.
+    Route::middleware(['auth', 'active', 'role:super_admin,admin_ppdb,verifier', 'no-store'])->group(function (): void {
         Route::get('/', fn () => redirect()->route('admin.dashboard'));
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
@@ -221,46 +237,46 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         // --- Konfigurasi PPDB ----------------------------------------------
         Route::middleware('role:super_admin,admin_ppdb')->group(function (): void {
             Route::resource('tahun-ajaran', AcademicYearController::class)
-                ->parameters(['tahun-ajaran' => 'academicYear'])->names('academic-years');
+                ->parameters(['tahun-ajaran' => 'academicYear'])->names('academic-years')->except('show');
             Route::post('tahun-ajaran/{academicYear}/aktifkan', [AcademicYearController::class, 'activate'])
                 ->name('academic-years.activate');
 
             Route::resource('gelombang', RegistrationWaveController::class)
-                ->parameters(['gelombang' => 'wave'])->names('waves');
+                ->parameters(['gelombang' => 'wave'])->names('waves')->except('show');
 
             Route::resource('jalur', AdmissionTrackController::class)
-                ->parameters(['jalur' => 'track'])->names('tracks');
+                ->parameters(['jalur' => 'track'])->names('tracks')->except('show');
             Route::put('jalur/{track}/persyaratan', [AdmissionTrackController::class, 'updateRequirements'])
                 ->name('tracks.requirements');
 
             Route::resource('program', ProgramController::class)
-                ->parameters(['program' => 'program'])->names('programs');
+                ->parameters(['program' => 'program'])->names('programs')->except('show');
 
             Route::resource('persyaratan', DocumentTypeController::class)
-                ->parameters(['persyaratan' => 'documentType'])->names('document-types');
+                ->parameters(['persyaratan' => 'documentType'])->names('document-types')->except('show');
 
             Route::resource('jadwal', PpdbScheduleController::class)
-                ->parameters(['jadwal' => 'schedule'])->names('schedules');
+                ->parameters(['jadwal' => 'schedule'])->names('schedules')->except('show');
 
             // --- Konten website --------------------------------------------
             Route::resource('pengumuman', AdminAnnouncementController::class)
-                ->parameters(['pengumuman' => 'announcement'])->names('announcements');
+                ->parameters(['pengumuman' => 'announcement'])->names('announcements')->except('show');
             Route::post('pengumuman/{announcement}/publikasi', [AdminAnnouncementController::class, 'togglePublish'])
                 ->name('announcements.publish');
 
             Route::resource('berita', AdminNewsController::class)
-                ->parameters(['berita' => 'news'])->names('news');
+                ->parameters(['berita' => 'news'])->names('news')->except('show');
 
             Route::resource('galeri', AdminGalleryController::class)
-                ->parameters(['galeri' => 'gallery'])->names('galleries');
+                ->parameters(['galeri' => 'gallery'])->names('galleries')->except('show');
             Route::post('galeri/{gallery}/gambar', [AdminGalleryController::class, 'storeImage'])->name('galleries.images.store');
             Route::delete('galeri/gambar/{image}', [AdminGalleryController::class, 'destroyImage'])->name('galleries.images.destroy');
 
             Route::resource('fasilitas', AdminFacilityController::class)
-                ->parameters(['fasilitas' => 'facility'])->names('facilities');
+                ->parameters(['fasilitas' => 'facility'])->names('facilities')->except('show');
 
             Route::resource('unduhan', AdminDownloadController::class)
-                ->parameters(['unduhan' => 'download'])->names('downloads');
+                ->parameters(['unduhan' => 'download'])->names('downloads')->except('show');
 
             Route::get('/profil-sekolah', [SchoolProfileController::class, 'index'])->name('school-profile.index');
             Route::put('/profil-sekolah/{profile}', [SchoolProfileController::class, 'update'])->name('school-profile.update');
@@ -268,9 +284,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
         // --- Sistem ---------------------------------------------------------
         Route::middleware('role:super_admin')->group(function (): void {
-            Route::resource('users', UserController::class)->names('users');
+            Route::resource('users', UserController::class)->names('users')->except('show');
             Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');
             Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+            Route::post('/settings/uji-email', [SettingController::class, 'sendTestMail'])->name('settings.test-mail');
         });
 
         Route::get('/activity-log', [ActivityLogController::class, 'index'])

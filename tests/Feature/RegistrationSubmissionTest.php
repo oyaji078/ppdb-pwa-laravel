@@ -18,37 +18,46 @@ class RegistrationSubmissionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_complete_draft_can_be_submitted_and_receives_credentials(): void
+    /**
+     * Credentials are issued when the account is opened, so submission only
+     * advances the status and must leave the number and code untouched.
+     */
+    public function test_a_complete_draft_can_be_submitted_and_keeps_its_credentials(): void
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
         $draft = $this->createSubmittableDraft($config);
 
-        $accessCode = app(RegistrationService::class)->submit($draft, statementAgreed: true);
+        $numberBefore = $draft->registration_number;
+        $hashBefore = $draft->user->password;
+
+        $this->assertNotNull($numberBefore, 'nomor pendaftaran terbit saat akun dibuat');
+
+        app(RegistrationService::class)->submit($draft, statementAgreed: true);
 
         $draft->refresh();
 
         $this->assertSame(RegistrationStatus::Submitted, $draft->registration_status);
         $this->assertNotNull($draft->submitted_at);
         $this->assertTrue($draft->statement_agreed);
-        $this->assertSame(10, strlen($draft->registration_number));
-        $this->assertSame(config('ppdb.access_code.length'), strlen($accessCode));
-        $this->assertTrue(app(AccessCodeService::class)->check($draft, $accessCode));
+        $this->assertSame($numberBefore, $draft->registration_number);
+        $this->assertSame($hashBefore, $draft->user->password);
+        $this->assertTrue(app(AccessCodeService::class)->check($draft, self::ACCESS_CODE));
     }
 
-    public function test_the_access_code_is_only_stored_as_a_hash(): void
+    public function test_the_password_is_only_stored_as_a_hash(): void
     {
         $this->fakePrivateDisk();
         $config = $this->createPpdbConfiguration();
         $draft = $this->createSubmittableDraft($config);
 
-        $accessCode = app(RegistrationService::class)->submit($draft, statementAgreed: true);
+        app(RegistrationService::class)->submit($draft, statementAgreed: true);
 
-        $stored = Registration::query()->find($draft->id)->access_code_hash;
+        $stored = Registration::query()->find($draft->id)->user->password;
 
-        $this->assertNotSame($accessCode, $stored);
-        $this->assertStringNotContainsString($accessCode, $stored);
-        $this->assertDatabaseMissing('registrations', ['access_code_hash' => $accessCode]);
+        $this->assertNotSame(self::ACCESS_CODE, $stored);
+        $this->assertStringNotContainsString(self::ACCESS_CODE, $stored);
+        $this->assertDatabaseMissing('users', ['password' => self::ACCESS_CODE]);
     }
 
     public function test_the_access_code_only_uses_unambiguous_characters(): void
@@ -99,7 +108,7 @@ class RegistrationSubmissionTest extends TestCase
         try {
             app(RegistrationService::class)->submit($draft, statementAgreed: false);
         } finally {
-            $this->assertNull($draft->fresh()->registration_number);
+            $this->assertNull($draft->fresh()->submitted_at);
             $this->assertSame(RegistrationStatus::Draft, $draft->fresh()->registration_status);
         }
     }
@@ -118,7 +127,7 @@ class RegistrationSubmissionTest extends TestCase
         try {
             app(RegistrationService::class)->submit($draft, statementAgreed: true);
         } finally {
-            $this->assertNull($draft->fresh()->registration_number);
+            $this->assertNull($draft->fresh()->submitted_at);
         }
     }
 
@@ -177,13 +186,11 @@ class RegistrationSubmissionTest extends TestCase
 
         $draft->refresh();
 
-        $this->assertNull($draft->registration_number);
-        $this->assertNull($draft->access_code_hash);
+        // The credentials predate this transaction and must survive it; what a
+        // rollback has to undo is the status change and its side effects.
+        $this->assertNull($draft->submitted_at);
         $this->assertSame(RegistrationStatus::Draft, $draft->registration_status);
+        $this->assertFalse((bool) $draft->statement_agreed);
         $this->assertDatabaseCount('notifications', 0);
-
-        // The counter row is created inside the same transaction, so a rollback
-        // leaves no consumed sequence behind.
-        $this->assertDatabaseCount('registration_counters', 0);
     }
 }

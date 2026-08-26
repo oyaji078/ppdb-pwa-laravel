@@ -87,7 +87,9 @@ class FacilityController extends Controller
 
         unset($validated['image']);
 
-        $validated['slug'] = Str::slug($validated['slug'] ?: $validated['name']) ?: 'fasilitas-'.now()->timestamp;
+        // The form has no slug field, so the key is absent rather than empty:
+        // "?:" alone would read an undefined index.
+        $validated['slug'] = Str::slug(($validated['slug'] ?? null) ?: $validated['name']) ?: 'fasilitas-'.now()->timestamp;
         $validated['is_active'] = $request->boolean('is_active');
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
 

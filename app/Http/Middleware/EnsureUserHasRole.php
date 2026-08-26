@@ -18,7 +18,7 @@ class EnsureUserHasRole
         $user = Auth::user();
 
         if ($user === null) {
-            return redirect()->route('admin.login');
+            return redirect()->route('login');
         }
 
         $allowed = array_filter(array_map(
