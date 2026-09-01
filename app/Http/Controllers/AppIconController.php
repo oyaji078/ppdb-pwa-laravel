@@ -44,13 +44,30 @@ class AppIconController extends Controller
 
         $maskable = $request->boolean('maskable');
 
-        $png = Cache::remember(
-            sprintf('app-icon:%s:%d:%s', $this->settings->iconVersion(), $size, $maskable ? 'maskable' : 'any'),
+        // Base64 rather than the raw bytes: the cache store is a database
+        // column holding text, and a PNG is full of bytes no text column will
+        // take. Laravel's own store guards against this, but only on Postgres,
+        // so on MySQL the write was rejected outright ("Incorrect string
+        // value") and every icon request became a 500.
+        //
+        // The "b64" in the key marks the format. Entries written before this
+        // hold raw bytes, and decoding one of those would yield rubbish, so
+        // they are left to expire rather than read.
+        $encoded = Cache::remember(
+            sprintf('app-icon:b64:%s:%d:%s', $this->settings->iconVersion(), $size, $maskable ? 'maskable' : 'any'),
             self::CACHE_TTL,
-            fn (): ?string => $this->render($size, $maskable),
+            function () use ($size, $maskable): ?string {
+                $rendered = $this->render($size, $maskable);
+
+                return $rendered === null ? null : base64_encode($rendered);
+            },
         );
 
-        abort_if($png === null, 404);
+        abort_if($encoded === null, 404);
+
+        $png = base64_decode($encoded, true);
+
+        abort_if($png === false, 404);
 
         return response($png, 200, [
             'Content-Type' => 'image/png',
