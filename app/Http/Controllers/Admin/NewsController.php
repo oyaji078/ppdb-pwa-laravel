@@ -20,7 +20,7 @@ class NewsController extends Controller
         return view('admin.news.index', [
             'news' => News::query()
                 ->with('author')
-                ->when($request->filled('q'), fn ($q) => $q->where('title', 'like', '%'.$request->string('q').'%'))
+                ->when($request->filled('q'), fn ($q) => $q->whereLike('title', '%'.$request->string('q').'%'))
                 ->latest('created_at')
                 ->paginate(15)
                 ->withQueryString(),

@@ -24,9 +24,9 @@ class UserController extends Controller
                 // managed from the registration screens, not here.
                 ->whereNot('role', UserRole::Applicant)
                 ->when($request->filled('q'), fn ($q) => $q->where(
-                    fn ($query) => $query->where('name', 'like', '%'.$request->string('q').'%')
-                        ->orWhere('username', 'like', '%'.$request->string('q').'%')
-                        ->orWhere('email', 'like', '%'.$request->string('q').'%')
+                    fn ($query) => $query->whereLike('name', '%'.$request->string('q').'%')
+                        ->orWhereLike('username', '%'.$request->string('q').'%')
+                        ->orWhereLike('email', '%'.$request->string('q').'%')
                 ))
                 ->when($request->filled('role'), fn ($q) => $q->where('role', $request->string('role')))
                 ->orderBy('name')

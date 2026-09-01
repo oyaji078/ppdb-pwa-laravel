@@ -23,7 +23,7 @@ class AnnouncementController extends Controller
             'announcements' => Announcement::query()
                 ->with(['academicYear', 'author'])
                 ->when($request->filled('audience'), fn ($q) => $q->where('audience', $request->string('audience')))
-                ->when($request->filled('q'), fn ($q) => $q->where('title', 'like', '%'.$request->string('q').'%'))
+                ->when($request->filled('q'), fn ($q) => $q->whereLike('title', '%'.$request->string('q').'%'))
                 ->latest('created_at')
                 ->paginate(15)
                 ->withQueryString(),

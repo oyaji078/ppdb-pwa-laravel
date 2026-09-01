@@ -41,12 +41,12 @@ trait FiltersRegistrations
             ->when($request->filled('reregistration_status'),
                 fn (Builder $q) => $q->where('reregistration_status', $request->string('reregistration_status')))
             ->when($search !== '', fn (Builder $q) => $q->where(function (Builder $query) use ($search): void {
-                $query->where('registration_number', 'like', "%{$search}%")
+                $query->whereLike('registration_number', "%{$search}%")
                     ->orWhereHas('applicant', fn (Builder $a) => $a
-                        ->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('nisn', 'like', "%{$search}%"))
+                        ->whereLike('full_name', "%{$search}%")
+                        ->orWhereLike('nisn', "%{$search}%"))
                     ->orWhereHas('applicant.previousSchool', fn (Builder $s) => $s
-                        ->where('school_name', 'like', "%{$search}%"));
+                        ->whereLike('school_name', "%{$search}%"));
             }));
     }
 

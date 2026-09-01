@@ -46,20 +46,29 @@ return new class extends Migration
     }
 
     /**
-     * The suite runs on SQLite and production on MySQL, so the date arithmetic
-     * is written for whichever driver is connected.
+     * The suite runs on SQLite and production on Postgres, with MySQL still
+     * supported for a self-hosted install, so the date arithmetic is written
+     * for whichever driver is connected.
+     *
+     * Postgres will not coerce text into a date column on its own, which is
+     * why its branch casts explicitly rather than relying on concatenation
+     * alone as MySQL does.
      */
     private function yearToDateExpression(): string
     {
-        return DB::getDriverName() === 'sqlite'
-            ? "birth_year || '-01-01'"
-            : "CONCAT(birth_year, '-01-01')";
+        return match (DB::getDriverName()) {
+            'sqlite' => "birth_year || '-01-01'",
+            'pgsql' => "CAST(birth_year || '-01-01' AS DATE)",
+            default => "CONCAT(birth_year, '-01-01')",
+        };
     }
 
     private function dateToYearExpression(): string
     {
-        return DB::getDriverName() === 'sqlite'
-            ? "CAST(strftime('%Y', birth_date) AS INTEGER)"
-            : 'YEAR(birth_date)';
+        return match (DB::getDriverName()) {
+            'sqlite' => "CAST(strftime('%Y', birth_date) AS INTEGER)",
+            'pgsql' => 'EXTRACT(YEAR FROM birth_date)',
+            default => 'YEAR(birth_date)',
+        };
     }
 };

@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -33,6 +34,28 @@ class LoginController extends Controller
     }
 
     /**
+     * How the identifier is actually spelled in the database, or the typed
+     * value when no account matches.
+     *
+     * People type their address however their keyboard capitalised it, and
+     * under MySQL the collation quietly matched it anyway. Postgres compares
+     * exactly, so a parent whose address was stored lowercase could no longer
+     * sign in after typing it with a capital. The comparison is lowered on both
+     * sides rather than done with LIKE, so that an underscore in a username is
+     * a literal character and not a wildcard.
+     *
+     * Returning the typed value when nothing matches keeps the failure on the
+     * single "wrong e-mail or password" path below, which is what stops the
+     * form being used to discover which accounts exist.
+     */
+    private function storedSpelling(string $field, string $identifier): string
+    {
+        return User::query()
+            ->whereRaw(sprintf('LOWER(%s) = ?', $field), [Str::lower($identifier)])
+            ->value($field) ?? $identifier;
+    }
+
+    /**
      * Rate limited by the throttle:login middleware on the route.
      */
     public function store(Request $request): RedirectResponse
@@ -49,7 +72,7 @@ class LoginController extends Controller
         $field = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
         $attempted = Auth::attempt(
-            [$field => $identifier, 'password' => $credentials['password'], 'is_active' => true],
+            [$field => $this->storedSpelling($field, $identifier), 'password' => $credentials['password'], 'is_active' => true],
             $request->boolean('remember'),
         );
 

@@ -90,7 +90,13 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            // POSTGRES_URL is injected and rotated by Vercel when a Marketplace
+            // Postgres store is connected, and it is the pooled endpoint, which
+            // is the one a serverless function must use: every invocation opens
+            // its own connection, and the direct endpoint runs out of them.
+            // Reading it here rather than copying the credential into DB_URL
+            // means a rotation is picked up without a redeploy.
+            'url' => env('DB_URL', env('POSTGRES_URL')),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),

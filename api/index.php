@@ -62,6 +62,20 @@ foreach ([
     $_ENV[$key] = $_SERVER[$key] = $value;
 }
 
+// Neon picks the database branch from the TLS server name, which the libpq
+// built into this runtime is too old to send: every connection comes back as
+// "Endpoint ID is not specified". libpq does read PGOPTIONS when it connects,
+// so the endpoint is taken from the host it would otherwise have signalled and
+// passed along explicitly. Derived rather than hardcoded so that pointing the
+// app at another branch stays a matter of changing the URL alone.
+if (getenv('PGOPTIONS') === false) {
+    $postgresHost = parse_url((string) ($_ENV['DB_URL'] ?? $_ENV['POSTGRES_URL'] ?? ''), PHP_URL_HOST);
+
+    if (is_string($postgresHost) && str_ends_with($postgresHost, '.neon.tech')) {
+        putenv('PGOPTIONS=endpoint='.str_replace('-pooler', '', strtok($postgresHost, '.')));
+    }
+}
+
 require __DIR__.'/../vendor/autoload.php';
 
 /** @var Application $app */

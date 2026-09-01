@@ -8,6 +8,7 @@ use App\Models\Registration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Aggregates for the admin dashboard. Every figure comes from a query; nothing
@@ -49,7 +50,7 @@ class DashboardService
 
         $counts = $this->scopedQuery($academicYearId, $waveId)
             ->where('submitted_at', '>=', $start)
-            ->selectRaw('DATE(submitted_at) as day, COUNT(*) as total')
+            ->selectRaw($this->dayExpression().' as day, COUNT(*) as total')
             ->groupBy('day')
             ->pluck('total', 'day');
 
@@ -187,5 +188,18 @@ class DashboardService
             ->submitted()
             ->forYear($academicYearId)
             ->when($waveId, fn (Builder $query) => $query->where('registration_wave_id', $waveId));
+    }
+
+    /**
+     * Truncates a timestamp to a date, for grouping the trend chart by day.
+     *
+     * Postgres has no DATE() function, so the cast is written for whichever
+     * driver is connected: the suite runs on SQLite and production on Postgres.
+     */
+    private function dayExpression(): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql'
+            ? 'CAST(submitted_at AS DATE)'
+            : 'DATE(submitted_at)';
     }
 }

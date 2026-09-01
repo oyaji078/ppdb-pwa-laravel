@@ -16,7 +16,7 @@ class NewsController extends Controller
         $news = News::query()
             ->published()
             ->when($search !== '', fn ($query) => $query->where(
-                fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('excerpt', 'like', "%{$search}%")
+                fn ($q) => $q->whereLike('title', "%{$search}%")->orWhereLike('excerpt', "%{$search}%")
             ))
             ->latest('published_at')
             ->paginate(9)

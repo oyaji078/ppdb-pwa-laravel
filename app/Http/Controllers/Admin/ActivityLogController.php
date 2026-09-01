@@ -20,7 +20,7 @@ class ActivityLogController extends Controller
                 ->when($request->filled('user_id'), fn ($q) => $q->where('user_id', $request->integer('user_id')))
                 ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->date('from')))
                 ->when($request->filled('to'), fn ($q) => $q->whereDate('created_at', '<=', $request->date('to')))
-                ->when($request->filled('q'), fn ($q) => $q->where('description', 'like', '%'.$request->string('q').'%'))
+                ->when($request->filled('q'), fn ($q) => $q->whereLike('description', '%'.$request->string('q').'%'))
                 ->latest('created_at')
                 ->paginate(30)
                 ->withQueryString(),
