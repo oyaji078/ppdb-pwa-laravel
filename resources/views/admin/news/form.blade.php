@@ -52,15 +52,19 @@
                 @enderror
             </div>
 
-            <x-form.input name="published_at" type="datetime-local" label="Tanggal Publikasi"
+            <x-form.input name="published_at" type="datetime-local" label="Jadwalkan Terbit (opsional)"
                           :value="$news->published_at?->format('Y-m-d\TH:i')"
-                          hint="Kosongkan untuk menggunakan waktu saat ini." />
+                          hint="Biarkan kosong agar berita langsung tayang begitu disimpan. Isi hanya bila ingin menundanya sampai waktu tertentu." />
 
             <x-form.input name="slug" label="Slug URL" :value="$news->slug"
                           placeholder="dibuat otomatis dari judul" />
 
             <div class="sm:col-span-2">
-                <x-form.checkbox name="is_published" label="Terbitkan sekarang" :checked="$news->is_published" />
+                <x-form.checkbox name="is_published" label="Terbitkan berita ini"
+                                 :checked="$news->is_published" />
+                <p class="mt-1 text-xs text-slate-500">
+                    Tanpa tanda centang, berita tersimpan sebagai draf dan tidak terlihat pengunjung.
+                </p>
             </div>
         </div>
 
