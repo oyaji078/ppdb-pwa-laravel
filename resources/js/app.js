@@ -6,6 +6,7 @@ import { icons, normaliseIconNames } from './icons';
 import './charts';
 import './document-upload';
 import './form-draft';
+import './gallery-upload';
 import './pwa';
 
 Alpine.plugin(collapse);

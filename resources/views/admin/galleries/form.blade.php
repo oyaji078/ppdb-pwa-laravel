@@ -12,7 +12,13 @@
 @section('content')
     <div class="max-w-4xl space-y-5">
         <form method="POST" action="{{ $gallery->exists ? route('admin.galleries.update', $gallery) : route('admin.galleries.store') }}"
-              class="card p-6">
+              class="card p-6" enctype="multipart/form-data"
+              @unless ($gallery->exists)
+                  data-gallery-create
+                  {{-- Where the photos go once the album has an id. Built here
+                       so the route stays defined in one place. --}}
+                  data-images-url="{{ route('admin.galleries.images.store', ['gallery' => '__id__']) }}"
+              @endunless>
             @csrf
             @if ($gallery->exists)
                 @method('PUT')
@@ -37,10 +43,23 @@
                 </div>
             </div>
 
+            {{-- Photos belong to an album, so they can only be stored once it
+                 exists. Rather than making that the operator's problem by
+                 sending them away to a second screen, the picker is offered
+                 here and the page saves the album first, then the photos. --}}
+            @unless ($gallery->exists)
+                <h2 class="mt-8 border-t border-slate-100 pt-6 font-semibold text-slate-900">Foto Album</h2>
+                <p class="mt-1 text-sm text-slate-600">Boleh dikosongkan; foto bisa ditambahkan kapan saja setelah album dibuat.</p>
+
+                <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                    @include('partials.gallery-image-picker', ['creating' => true])
+                </div>
+            @endunless
+
             <div class="mt-6 flex gap-3 border-t border-slate-100 pt-5">
                 <button type="submit" class="btn-primary">
                     <x-icon name="save" class="h-4 w-4" />
-                    Simpan
+                    <span data-gallery-submit-label>Simpan</span>
                 </button>
                 <a href="{{ route('admin.galleries.index') }}" class="btn-secondary">Batal</a>
             </div>
@@ -51,36 +70,11 @@
                 <h2 class="font-semibold text-slate-900">Foto Album</h2>
 
                 <form method="POST" action="{{ route('admin.galleries.images.store', $gallery) }}"
-                      enctype="multipart/form-data" class="mt-4 grid gap-4 sm:grid-cols-3">
+                      enctype="multipart/form-data" class="mt-4 grid gap-4 sm:grid-cols-3"
+                      data-gallery-upload>
                     @csrf
 
-                    <div class="sm:col-span-2">
-                        <label for="images" class="form-label">Pilih Foto (bisa lebih dari satu)</label>
-                        <input type="file" name="images[]" id="images" multiple required accept=".jpg,.jpeg,.png,.webp"
-                               class="block w-full cursor-pointer rounded-lg text-sm text-slate-600 ring-1 ring-slate-300 ring-inset file:mr-3 file:cursor-pointer file:rounded-l-lg file:border-0 file:bg-slate-50 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-100">
-                        <p class="mt-1 text-xs text-slate-500">JPG, PNG, atau WEBP. Maksimal 3 MB per foto, hingga 20 foto sekaligus.</p>
-
-                        {{-- Per-file failures land on "images.0", "images.1", ... so a
-                             plain @error('images') would hide them. The wildcard lookup
-                             returns one array per key, hence the spread; identical
-                             messages across files are collapsed into one line. --}}
-                        @php
-                            $imageErrors = array_unique(array_merge(
-                                $errors->get('images'),
-                                ...array_values($errors->get('images.*'))
-                            ));
-                        @endphp
-                        @foreach ($imageErrors as $message)
-                            <p class="form-error">
-                                <x-icon name="circle-alert" class="mt-px h-3.5 w-3.5 shrink-0" />
-                                <span>{{ $message }}</span>
-                            </p>
-                        @endforeach
-                    </div>
-
-                    <div>
-                        <x-form.input name="caption" label="Keterangan (opsional)" placeholder="Berlaku untuk semua foto" />
-                    </div>
+                    @include('partials.gallery-image-picker', ['creating' => false])
 
                     <div class="sm:col-span-3">
                         <button type="submit" class="btn-primary">

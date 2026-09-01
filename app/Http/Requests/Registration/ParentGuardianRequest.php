@@ -22,8 +22,9 @@ class ParentGuardianRequest extends FormRequest
     }
 
     /**
-     * Father and mother are always collected; the guardian block is optional
-     * and only validated once a name is entered.
+     * Only three things are actually required: the name of each parent who is
+     * still living, and one phone number among the three blocks. Everything
+     * else may be left empty.
      *
      * @return array<string, mixed>
      */
@@ -49,52 +50,70 @@ class ParentGuardianRequest extends FormRequest
             }
         }
 
-        $rules['father.name'] = ['required', 'string', 'max:150'];
+        // A parent's name is asked for only while they are recorded as living.
+        // Clearing "masih hidup" is how someone says there is nothing to fill
+        // in, so it has to release the rest of the block rather than leave the
+        // form unsubmittable.
+        $rules['father.name'] = [$this->parentIsAlive('father') ? 'required' : 'nullable', 'string', 'max:150'];
         $rules['father.is_alive'] = ['nullable', 'boolean'];
 
-        $rules['mother.name'] = ['required', 'string', 'max:150'];
+        $rules['mother.name'] = [$this->parentIsAlive('mother') ? 'required' : 'nullable', 'string', 'max:150'];
         $rules['mother.is_alive'] = ['nullable', 'boolean'];
 
-        $rules['guardian.name'] = ['nullable', 'string', 'max:150'];
+        // The guardian block is optional as a whole, but a nameless guardian is
+        // discarded on save, so details typed without a name would vanish
+        // without anyone being told.
+        $rules['guardian.name'] = [$this->guardianHasDetails() ? 'required' : 'nullable', 'string', 'max:150'];
         $rules['guardian.address'] = ['nullable', 'string', 'max:500'];
 
         return $rules;
+    }
+
+    /**
+     * Whether this parent is recorded as still living.
+     *
+     * The checkbox posts "0" through its hidden companion when cleared, so a
+     * missing key means the field was never on the form at all rather than that
+     * someone unticked it.
+     */
+    private function parentIsAlive(string $prefix): bool
+    {
+        return (bool) $this->input($prefix.'.is_alive', true);
+    }
+
+    /**
+     * Whether anything was typed into the guardian block apart from the name.
+     */
+    private function guardianHasDetails(): bool
+    {
+        return collect(['nik', 'birth_date', 'education', 'occupation', 'monthly_income', 'phone', 'address'])
+            ->contains(fn (string $field) => filled($this->input('guardian.'.$field)));
     }
 
     public function after(): array
     {
         return [
             function (Validator $validator): void {
-                $father = $this->input('father', []);
-                $mother = $this->input('mother', []);
-                $guardian = $this->input('guardian', []);
+                // One contactable adult is the only hard requirement across the
+                // three blocks; the committee needs somewhere to send a revision
+                // request. Which of them supplies it is up to the family.
+                $reachable = collect(['father', 'mother', 'guardian'])
+                    ->contains(fn (string $prefix) => filled($this->input($prefix.'.phone')));
 
-                // At least one contactable adult; the committee relies on it for
-                // revision requests. A parent marked as no longer living is not
-                // expected to supply one, so the guardian can stand in.
-                $reachable = collect([$father, $mother, $guardian])
-                    ->contains(fn (array $person) => filled($person['phone'] ?? null));
-
-                if (! $reachable) {
-                    $validator->errors()->add(
-                        'father.phone',
-                        'Isi nomor HP salah satu orang tua atau wali agar panitia dapat menghubungi Anda.'
-                    );
+                if ($reachable) {
+                    return;
                 }
 
-                // A living parent with no way to be reached is almost always an
-                // oversight rather than a deliberate choice.
-                foreach (['father' => 'Ayah', 'mother' => 'Ibu'] as $prefix => $label) {
-                    $person = $prefix === 'father' ? $father : $mother;
+                // Attach the message to someone who could actually answer: a
+                // parent recorded as no longer living cannot supply a number, so
+                // once both are gone it is the guardian being asked.
+                $target = collect(['father', 'mother'])
+                    ->first(fn (string $prefix) => $this->parentIsAlive($prefix)) ?? 'guardian';
 
-                    if (! (bool) ($person['is_alive'] ?? true)) {
-                        continue;
-                    }
-
-                    if (blank($person['phone'] ?? null) && ! $reachable) {
-                        $validator->errors()->add($prefix.'.phone', sprintf('Nomor HP %s belum diisi.', $label));
-                    }
-                }
+                $validator->errors()->add(
+                    $target.'.phone',
+                    'Isi nomor HP salah satu orang tua atau wali agar panitia dapat menghubungi Anda.'
+                );
             },
         ];
     }
@@ -131,6 +150,13 @@ class ParentGuardianRequest extends FormRequest
             '*.phone.min' => ':attribute terlalu pendek.',
             '*.birth_date.after' => ':attribute tidak wajar. Periksa kembali isian Anda.',
             '*.birth_date.before' => ':attribute harus berusia minimal '.self::YOUNGEST_YEARS.' tahun.',
+
+            // Each of these says how to satisfy the rule, not just that it was
+            // broken: the way out of the first two is a checkbox further down
+            // the block, which is not obvious from the field itself.
+            'father.name.required' => 'Nama Ayah wajib diisi. Bila ayah sudah meninggal, hapus centang "Masih hidup" pada bagian Data Ayah.',
+            'mother.name.required' => 'Nama Ibu wajib diisi. Bila ibu sudah meninggal, hapus centang "Masih hidup" pada bagian Data Ibu.',
+            'guardian.name.required' => 'Nama Wali wajib diisi bila ada data wali lain yang terisi. Kosongkan seluruh bagian Data Wali bila tidak ada wali.',
         ];
     }
 

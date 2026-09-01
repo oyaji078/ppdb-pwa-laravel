@@ -27,11 +27,13 @@ class ParentGuardianFormTest extends TestCase
     }
 
     /**
-     * The phone rule is "at least one of the three", which the browser cannot
-     * express. It must still be marked, but marking it with `required` would
-     * block a submission the server would have accepted.
+     * Neither rule on this step is one the browser can express: the phone is
+     * "at least one of the three", and the name is required only while that
+     * parent is recorded as living. Both are marked with an asterisk, and
+     * neither carries `required`, which would block a submission the server
+     * accepts — including the one from a family whose parent has died.
      */
-    public function test_required_parent_fields_are_marked_including_the_phone_rule(): void
+    public function test_required_parent_fields_are_marked_without_blocking_the_browser(): void
     {
         $html = $this->openParentsStep();
 
@@ -39,7 +41,7 @@ class ParentGuardianFormTest extends TestCase
             $this->assertLabelStarred($html, $prefix.'_name');
             $this->assertLabelStarred($html, $prefix.'_phone');
 
-            $this->assertInputHas($html, $prefix.'[name]', 'required');
+            $this->assertInputLacks($html, $prefix.'[name]', 'required');
             $this->assertInputLacks($html, $prefix.'[phone]', 'required');
         }
 
@@ -167,6 +169,108 @@ class ParentGuardianFormTest extends TestCase
         $this->from(route('registration.parents'))
             ->post(route('registration.parents.store'), $payload)
             ->assertSessionHasErrors('father.phone');
+    }
+
+    /**
+     * Clearing "masih hidup" is how a family says there is nothing to fill in
+     * for that parent. It has to release the name with it, or the step cannot
+     * be completed at all.
+     */
+    public function test_a_parent_marked_as_died_may_be_left_entirely_blank(): void
+    {
+        $draft = $this->signedInDraft();
+
+        $payload = $this->parents();
+        $payload['father'] = ['is_alive' => '0'];
+
+        $this->from(route('registration.parents'))
+            ->post(route('registration.parents.store'), $payload)
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('registration.previous-school'));
+
+        $father = ParentGuardian::query()
+            ->where('applicant_id', $draft->applicant_id)
+            ->where('relationship', 'father')
+            ->firstOrFail();
+
+        $this->assertFalse($father->is_alive);
+        $this->assertNull($father->name);
+    }
+
+    public function test_a_living_parent_still_needs_a_name(): void
+    {
+        $this->signedInDraft();
+
+        $payload = $this->parents();
+        $payload['father']['name'] = '';
+
+        $this->from(route('registration.parents'))
+            ->post(route('registration.parents.store'), $payload)
+            ->assertSessionHasErrors('father.name');
+    }
+
+    /**
+     * Everything except the two names and one phone number is optional, and an
+     * empty value has to be accepted rather than tripping a format rule.
+     */
+    public function test_every_other_field_may_be_left_empty(): void
+    {
+        $draft = $this->signedInDraft();
+
+        $payload = [
+            'father' => ['name' => 'Muhammad Yusuf', 'phone' => '081234567891', 'is_alive' => '1'],
+            'mother' => ['name' => 'Siti Aminah', 'is_alive' => '1'],
+            'guardian' => ['name' => ''],
+        ];
+
+        $this->from(route('registration.parents'))
+            ->post(route('registration.parents.store'), $payload)
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('registration.previous-school'));
+
+        $mother = ParentGuardian::query()
+            ->where('applicant_id', $draft->applicant_id)
+            ->where('relationship', 'mother')
+            ->firstOrFail();
+
+        $this->assertNull($mother->nik);
+        $this->assertNull($mother->birth_date);
+        $this->assertNull($mother->occupation);
+        $this->assertNull($mother->phone);
+    }
+
+    /**
+     * A guardian with no name is deleted on save, so details typed without one
+     * would disappear silently. The form says so instead.
+     */
+    public function test_guardian_details_without_a_name_are_refused_rather_than_dropped(): void
+    {
+        $this->signedInDraft();
+
+        $payload = $this->parents();
+        $payload['guardian'] = ['name' => '', 'phone' => '081200009999', 'occupation' => 'Wiraswasta'];
+
+        $this->from(route('registration.parents'))
+            ->post(route('registration.parents.store'), $payload)
+            ->assertSessionHasErrors('guardian.name');
+    }
+
+    /**
+     * With both parents gone, the missing-number message belongs on the
+     * guardian: nobody can ask a deceased parent for a phone.
+     */
+    public function test_the_contact_message_points_at_the_guardian_when_both_parents_have_died(): void
+    {
+        $this->signedInDraft();
+
+        $payload = $this->parents();
+        $payload['father'] = ['is_alive' => '0'];
+        $payload['mother'] = ['is_alive' => '0'];
+
+        $this->from(route('registration.parents'))
+            ->post(route('registration.parents.store'), $payload)
+            ->assertSessionHasErrors('guardian.phone')
+            ->assertSessionDoesntHaveErrors('father.phone');
     }
 
     public function test_a_nik_that_is_not_sixteen_digits_is_refused(): void
