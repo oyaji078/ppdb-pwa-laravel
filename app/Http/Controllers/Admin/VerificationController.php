@@ -106,6 +106,42 @@ class VerificationController extends Controller
         return back()->with('success', sprintf('%s ditandai sebagai %s.', $document->documentType->name, $status->label()));
     }
 
+    /**
+     * Approves every document still awaiting a decision, in one press.
+     *
+     * When a set of scans is simply fine — which is the common case — deciding
+     * them one at a time means one page reload per document. Anything already
+     * marked for revision or rejected is left alone: clearing those is a real
+     * judgement and has to stay deliberate.
+     */
+    public function approveAll(Registration $registration, Request $request): RedirectResponse
+    {
+        // Both relations are loaded up front: VerificationService writes an
+        // activity line naming the document type and syncs the registration's
+        // own status, and lazy loading is off outside production.
+        $pending = $registration->documents()
+            ->where('verification_status', DocumentStatus::Pending->value)
+            ->with(['documentType', 'registration'])
+            ->get();
+
+        foreach ($pending as $document) {
+            $this->authorize('verify', $document);
+        }
+
+        foreach ($pending as $document) {
+            $this->verification->decide($document, DocumentStatus::Verified, $request->user(), null);
+        }
+
+        if ($pending->isEmpty()) {
+            return back()->with('info', 'Tidak ada berkas yang menunggu verifikasi.');
+        }
+
+        return back()->with('success', sprintf(
+            '%d berkas ditandai terverifikasi.',
+            $pending->count()
+        ));
+    }
+
     public function complete(Registration $registration, Request $request): RedirectResponse
     {
         $this->authorize('completeVerification', $registration);

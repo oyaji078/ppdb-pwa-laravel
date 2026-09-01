@@ -164,6 +164,56 @@ class DocumentVerificationTest extends TestCase
     /**
      * @return array{0: Registration, 1: RegistrationDocument}
      */
+    public function test_an_admin_can_approve_every_waiting_document_at_once(): void
+    {
+        [$registration] = $this->submitted();
+        $admin = $this->createAdmin();
+
+        $waiting = $registration->documents()->count();
+
+        $this->assertGreaterThan(1, $waiting, 'butuh lebih dari satu berkas agar aksi massal bermakna');
+
+        $this->actingAs($admin)
+            ->post(route('admin.verification.approve-all', $registration))
+            ->assertSessionHasNoErrors();
+
+        $registration->refresh()->load('documents');
+
+        foreach ($registration->documents as $document) {
+            $this->assertSame(DocumentStatus::Verified, $document->verification_status);
+            $this->assertSame($admin->id, $document->verified_by);
+        }
+    }
+
+    /**
+     * Approving in bulk must not quietly reverse a decision someone already
+     * made: a file sent back for revision stays that way until it is looked at.
+     */
+    public function test_approving_all_leaves_a_document_already_sent_back_alone(): void
+    {
+        [$registration, $document] = $this->submitted();
+        $admin = $this->createAdmin();
+
+        app(VerificationService::class)->decide(
+            $document,
+            DocumentStatus::RevisionRequired,
+            $admin,
+            'Hasil pindai terlalu buram.'
+        );
+
+        $this->actingAs($admin)
+            ->post(route('admin.verification.approve-all', $registration))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(DocumentStatus::RevisionRequired, $document->refresh()->verification_status);
+
+        $others = $registration->documents()->whereKeyNot($document->id)->get();
+
+        foreach ($others as $other) {
+            $this->assertSame(DocumentStatus::Verified, $other->verification_status);
+        }
+    }
+
     private function submitted(): array
     {
         $this->fakePrivateDisk();

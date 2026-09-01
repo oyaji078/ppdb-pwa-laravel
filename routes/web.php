@@ -221,6 +221,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/verifikasi', [VerificationController::class, 'index'])->name('verification.index');
         Route::get('/verifikasi/{registration}', [VerificationController::class, 'show'])->name('verification.show');
         Route::post('/verifikasi/berkas/{document}', [VerificationController::class, 'decide'])->name('verification.decide');
+        Route::post('/verifikasi/{registration}/setujui-semua', [VerificationController::class, 'approveAll'])->name('verification.approve-all');
         Route::post('/verifikasi/{registration}/selesai', [VerificationController::class, 'complete'])->name('verification.complete');
         Route::post('/verifikasi/{registration}/buka', [VerificationController::class, 'reopen'])->name('verification.reopen');
 

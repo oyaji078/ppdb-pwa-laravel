@@ -27,6 +27,30 @@
                 </div>
             @endif
 
+            {{-- When a whole set of scans is simply fine, which is the usual
+                 case, deciding them one at a time costs a page reload each.
+                 Files already sent back for revision or rejected are untouched:
+                 undoing one of those is a judgement, not a bulk action. --}}
+            @php $awaiting = $uploaded->where('verification_status', \App\Enums\DocumentStatus::Pending); @endphp
+
+            @if ($awaiting->isNotEmpty())
+                <form method="POST" action="{{ route('admin.verification.approve-all', $registration) }}"
+                      class="card flex flex-wrap items-center justify-between gap-3 p-4"
+                      onsubmit="return confirm('Setujui {{ $awaiting->count() }} berkas yang menunggu verifikasi?')">
+                    @csrf
+
+                    <p class="text-sm text-slate-600">
+                        <span class="font-semibold text-slate-900">{{ $awaiting->count() }} berkas</span>
+                        menunggu verifikasi. Periksa dulu isinya, lalu setujui sekaligus bila semuanya sudah benar.
+                    </p>
+
+                    <button type="submit" class="btn-primary shrink-0">
+                        <x-icon name="check" class="h-4 w-4" />
+                        Setujui semua
+                    </button>
+                </form>
+            @endif
+
             @foreach ($documentTypes as $type)
                 @php $file = $uploaded[$type->id] ?? null; @endphp
 
