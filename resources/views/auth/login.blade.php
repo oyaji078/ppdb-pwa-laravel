@@ -11,7 +11,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
     <title>Masuk &mdash; {{ $settings->schoolName() }}</title>
-    <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
+    @include('partials.app-icons')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="flex min-h-full items-center justify-center bg-slate-900 px-4 py-12">

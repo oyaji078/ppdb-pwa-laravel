@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "regions": ["sin1"],
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.9.0",
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    { "source": "/index.php", "destination": "/", "permanent": false },
+    { "source": "/index.php/:path*", "destination": "/:path*", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index.php" }
+  ]
+}

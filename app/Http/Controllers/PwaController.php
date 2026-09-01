@@ -32,21 +32,24 @@ class PwaController extends Controller
             'background_color' => '#f8fafc',
             'theme_color' => '#1d4ed8',
             'categories' => ['education'],
+            // Rendered from the logo uploaded in the admin settings, so an
+            // installed app carries the school's own mark rather than the
+            // placeholder shipped with the source.
             'icons' => [
                 [
-                    'src' => asset('icons/icon-192.png'),
+                    'src' => $this->iconUrl(192),
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => asset('icons/icon-512.png'),
+                    'src' => $this->iconUrl(512),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => asset('icons/icon-maskable-512.png'),
+                    'src' => $this->iconUrl(512, maskable: true),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'maskable',
@@ -56,12 +59,12 @@ class PwaController extends Controller
                 [
                     'name' => 'Daftar',
                     'url' => route('registration.start', absolute: false),
-                    'icons' => [['src' => asset('icons/icon-192.png'), 'sizes' => '192x192']],
+                    'icons' => [['src' => $this->iconUrl(192), 'sizes' => '192x192']],
                 ],
                 [
                     'name' => 'Cek Status',
                     'url' => route('status.form', absolute: false),
-                    'icons' => [['src' => asset('icons/icon-192.png'), 'sizes' => '192x192']],
+                    'icons' => [['src' => $this->iconUrl(192), 'sizes' => '192x192']],
                 ],
             ],
         ], 200, ['Content-Type' => 'application/manifest+json']);
@@ -89,6 +92,21 @@ class PwaController extends Controller
     }
 
     /**
+     * URL of an app icon at the given size, versioned by the current logo so a
+     * new upload is picked up instead of being served from a stale cache.
+     */
+    private function iconUrl(int $size, bool $maskable = false): string
+    {
+        $query = ['size' => $size, 'v' => settings()->iconVersion()];
+
+        if ($maskable) {
+            $query['maskable'] = 1;
+        }
+
+        return route('pwa.icon', $query);
+    }
+
+    /**
      * Changing this string invalidates every cached entry after a deploy.
      */
     private function cacheVersion(): string
@@ -99,7 +117,9 @@ class PwaController extends Controller
             ? (string) filemtime($manifest)
             : (string) config('app.version', '1');
 
-        return 'ppdb-v'.substr(md5($signature.config('app.key')), 0, 10);
+        // The logo is part of the signature: replacing it has to evict the
+        // precached icons alongside the rest of the shell.
+        return 'ppdb-v'.substr(md5($signature.settings()->iconVersion().config('app.key')), 0, 10);
     }
 
     /**
@@ -120,8 +140,8 @@ class PwaController extends Controller
             route('ppdb.schedule', absolute: false),
             route('ppdb.requirements', absolute: false),
             route('contact', absolute: false),
-            asset('icons/icon-192.png'),
-            asset('icons/icon-512.png'),
+            $this->iconUrl(192),
+            $this->iconUrl(512),
         ];
     }
 }

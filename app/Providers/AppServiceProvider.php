@@ -2,22 +2,27 @@
 
 namespace App\Providers;
 
+use App\Filesystem\VercelBlobAdapter;
 use App\Models\Registration;
 use App\Models\RegistrationDocument;
 use App\Policies\RegistrationDocumentPolicy;
 use App\Policies\RegistrationPolicy;
 use App\Support\SettingsRepository;
+use App\Support\Vercel\BlobClient;
 use App\View\Composers\ApplicantComposer;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Filesystem\FilesystemAdapter as LaravelFilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use League\Flysystem\Filesystem as Flysystem;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -38,9 +43,30 @@ class AppServiceProvider extends ServiceProvider
         setlocale(LC_TIME, 'id_ID.UTF-8', 'id_ID', 'Indonesian');
         CarbonImmutable::setLocale('id');
 
+        $this->registerVercelBlobDriver();
         $this->registerRateLimiters();
         $this->registerPolicies();
         $this->shareViewData();
+    }
+
+    /**
+     * Vercel gives a function a read-only filesystem, so on that host the
+     * "public" and "private" disks point at a Vercel Blob store instead of at
+     * storage/app. Selected per disk through PUBLIC_DISK_DRIVER and
+     * PRIVATE_DISK_DRIVER, which stay unset -- and so local -- everywhere else.
+     */
+    private function registerVercelBlobDriver(): void
+    {
+        Storage::extend('vercel_blob', function ($app, array $config): LaravelFilesystemAdapter {
+            $access = $config['access'] ?? 'private';
+
+            $adapter = new VercelBlobAdapter(
+                new BlobClient((string) ($config['token'] ?? ''), $access),
+                $access,
+            );
+
+            return new LaravelFilesystemAdapter(new Flysystem($adapter, $config), $adapter, $config);
+        });
     }
 
     private function registerRateLimiters(): void

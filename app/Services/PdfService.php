@@ -132,14 +132,12 @@ class PdfService
 
     private function logoDataUri(): ?string
     {
-        $path = $this->settings->logoPath();
+        $logo = $this->settings->logoFile();
 
-        if ($path === null || ! is_readable($path)) {
+        if ($logo === null) {
             return null;
         }
 
-        $mime = @mime_content_type($path) ?: 'image/png';
-
-        return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($path));
+        return 'data:'.$logo['mime'].';base64,'.base64_encode($logo['contents']);
     }
 }

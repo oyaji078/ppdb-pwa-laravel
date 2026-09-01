@@ -84,7 +84,12 @@ return [
     */
 
     'uploads' => [
-        'absolute_max_size_kb' => 5120,
+        // Serverless hosts cap the request body well below this: a Vercel
+        // function rejects anything over 4.5 MB before PHP sees it, and the
+        // applicant would get an opaque 413 instead of a validation message.
+        // Lower the ceiling there through the environment rather than letting
+        // an upload the form advertised as valid fail at the edge.
+        'absolute_max_size_kb' => (int) env('PPDB_UPLOAD_MAX_KB', 5120),
         'default_max_size_kb' => 2048,
         'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png'],
         'mime_map' => [

@@ -223,17 +223,51 @@ class SettingsRepository
     }
 
     /**
-     * Absolute filesystem path of the logo, for embedding into PDFs.
+     * Fingerprint of the current logo, used to version every icon URL.
+     *
+     * Uploads get a random filename, so the stored path already changes
+     * whenever the logo does: hashing it gives a cache key that expires exactly
+     * when it should, and a stable one while the logo stays put.
      */
-    public function logoPath(): ?string
+    public function iconVersion(): string
+    {
+        return substr(md5((string) ($this->get('school_logo') ?? 'default')), 0, 10);
+    }
+
+    /**
+     * The logo's bytes and mime type, for embedding into PDFs and for resizing
+     * into app icons.
+     *
+     * Read through the disk rather than from a filesystem path: on Vercel the
+     * public disk is object storage, where a local path does not exist. The
+     * mime type comes from the extension so that this costs one round trip
+     * rather than two.
+     *
+     * @return array{contents: string, mime: string}|null
+     */
+    public function logoFile(): ?array
     {
         $path = $this->get('school_logo');
 
-        if (! $path || ! Storage::disk('public')->exists($path)) {
+        if (! $path) {
             return null;
         }
 
-        return Storage::disk('public')->path($path);
+        $contents = Storage::disk('public')->get($path);
+
+        if ($contents === null || $contents === '') {
+            return null;
+        }
+
+        return [
+            'contents' => $contents,
+            'mime' => match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'webp' => 'image/webp',
+                'svg' => 'image/svg+xml',
+                default => 'image/png',
+            },
+        ];
     }
 
     /**

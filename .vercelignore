@@ -1,0 +1,17 @@
+# Pulled in by composer during the function build.
+/vendor
+/node_modules
+
+# The Vercel entry point is api/index.php; shipping public/index.php would put
+# a second, unroutable copy of the front controller in the static output.
+/public/index.php
+/public/.htaccess
+/public/storage
+
+/tests
+/phpunit.xml
+/.phpunit.result.cache
+/storage/logs
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views

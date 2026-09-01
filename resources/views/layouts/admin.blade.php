@@ -7,9 +7,9 @@
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0f172a">
 
-    <title>@yield('title', 'Dashboard') &mdash; Panel Admin</title>
+    <title>@yield('title', 'Dashboard') &mdash; Panel Admin {{ $settings->schoolName() }}</title>
 
-    <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
+    @include('partials.app-icons')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>

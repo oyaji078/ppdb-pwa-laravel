@@ -7,9 +7,9 @@
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#1d4ed8">
 
-    <title>@yield('title', 'Dashboard') &mdash; Portal Pendaftar</title>
+    <title>@yield('title', 'Dashboard') &mdash; Portal Pendaftar {{ $settings->schoolName() }}</title>
 
-    <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
+    @include('partials.app-icons')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>

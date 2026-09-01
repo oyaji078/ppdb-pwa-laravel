@@ -38,3 +38,7 @@ Thumbs.db
 /database/*.sqlite-shm
 /database/*.sqlite-wal
 /storage/sqlite-test.json
+
+# Local Vercel project link and the credentials `vercel env pull` writes.
+# .env.local is already covered by the .env.* rule above.
+/.vercel

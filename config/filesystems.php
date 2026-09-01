@@ -44,21 +44,30 @@ return [
          * controller that checks the policy first.
          */
         'private' => [
-            'driver' => 'local',
+            'driver' => env('PRIVATE_DISK_DRIVER', 'local'),
             'root' => storage_path('app/private'),
             'serve' => false,
             'visibility' => 'private',
             'throw' => true,
             'report' => false,
+
+            // Read by the "vercel_blob" driver only. The store this token
+            // belongs to must have been created with private access: on Vercel
+            // the local root above is a throwaway /tmp directory.
+            'access' => 'private',
+            'token' => env('BLOB_PRIVATE_RW_TOKEN', env('PRIVATE_BLOB_READ_WRITE_TOKEN')),
         ],
 
         'public' => [
-            'driver' => 'local',
+            'driver' => env('PUBLIC_DISK_DRIVER', 'local'),
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
+
+            'access' => 'public',
+            'token' => env('BLOB_PUBLIC_RW_TOKEN', env('BLOB_READ_WRITE_TOKEN')),
         ],
 
         's3' => [

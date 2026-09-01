@@ -17,6 +17,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind a platform edge such as Vercel, TLS is terminated upstream and
+        // the visitor's address arrives in X-Forwarded-For. Untrusted, every
+        // request looks like it came from the same proxy address, and the rate
+        // limiters throttle the whole school as one visitor. Left unset on an
+        // ordinary server, where the header would be attacker-controlled.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));
+        }
+
         $middleware->web(append: [
             // Keeps the signed-in password hash in the session, so changing a
             // password (an applicant reset, a staff password change) signs that

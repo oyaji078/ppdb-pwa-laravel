@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\SelectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VerificationController;
+use App\Http\Controllers\AppIconController;
 use App\Http\Controllers\Applicant\AnnouncementController as ApplicantAnnouncementController;
 use App\Http\Controllers\Applicant\DashboardController as ApplicantDashboardController;
 use App\Http\Controllers\Applicant\DocumentController as ApplicantDocumentController;
@@ -82,6 +83,12 @@ Route::get('/ppdb/persyaratan', [PpdbInfoController::class, 'requirements'])->na
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
 Route::get('/sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.service-worker');
 Route::get('/offline', [PwaController::class, 'offline'])->name('pwa.offline');
+
+// Favicon, iOS home-screen icon and manifest icons, all derived from the logo
+// the school uploaded in the admin settings.
+Route::get('/app-icon/{size}.png', [AppIconController::class, 'show'])
+    ->whereNumber('size')
+    ->name('pwa.icon');
 
 /*
 |--------------------------------------------------------------------------

@@ -10,8 +10,7 @@
     <title>@yield('title', 'Beranda') &mdash; {{ $settings->schoolName() }}</title>
 
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
-    <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
-    <link rel="apple-touch-icon" href="{{ asset('icons/icon-192.png') }}">
+    @include('partials.app-icons')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
