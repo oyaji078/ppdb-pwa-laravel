@@ -22,6 +22,27 @@
                         <span>{{ $settings->get('school_address') }}</span>
                     </p>
                 @endif
+
+                {{-- Appears on every page as soon as coordinates are saved in
+                     the admin settings; until then the address above stands on
+                     its own rather than leaving an empty grey box. Loaded lazily
+                     so a map in the footer costs nothing until it is scrolled
+                     to. --}}
+                @if ($settings->hasMapLocation())
+                    <div class="mt-5 overflow-hidden rounded-xl ring-1 ring-white/10">
+                        <iframe src="{{ $settings->mapEmbedUrl() }}"
+                                title="Peta lokasi {{ $settings->schoolName() }}"
+                                class="block h-52 w-full border-0"
+                                loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                                allowfullscreen></iframe>
+                    </div>
+
+                    <a href="{{ $settings->mapLinkUrl() }}" target="_blank" rel="noopener"
+                       class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-brand-300 hover:text-brand-200">
+                        <x-icon name="map-pin" class="h-4 w-4" />
+                        Buka di Google Maps
+                    </a>
+                @endif
             </div>
 
             <div>

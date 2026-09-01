@@ -5,8 +5,10 @@
 @section('title', 'Pendaftaran - Buat Akun')
 
 @section('wizard')
-    <form method="POST" action="{{ route('registration.start.store') }}" class="card p-6 sm:p-8">
+    <form method="POST" action="{{ route('registration.start.store') }}" class="card p-6 sm:p-8" data-draft="akun">
         @csrf
+
+        <x-draft-note />
 
         <h2 class="text-lg font-bold text-slate-900">Buat Akun Pendaftaran</h2>
         <p class="mt-1 text-sm text-slate-600">

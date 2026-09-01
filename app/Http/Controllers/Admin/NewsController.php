@@ -95,7 +95,10 @@ class NewsController extends Controller
 
         unset($validated['cover']);
 
-        $base = Str::slug($validated['slug'] ?: $validated['title']) ?: 'berita';
+        // Coalesced rather than indexed: an optional field that was never sent
+        // is absent from the validated set, and a missing slug should fall back
+        // to the title rather than raise an undefined key.
+        $base = Str::slug(($validated['slug'] ?? null) ?: $validated['title']) ?: 'berita';
         $slug = $base;
         $suffix = 1;
 

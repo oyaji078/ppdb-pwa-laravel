@@ -5,8 +5,10 @@
 @section('title', 'Pendaftaran - Orang Tua/Wali')
 
 @section('wizard')
-    <form method="POST" action="{{ route('registration.parents.store') }}" class="card p-6 sm:p-8">
+    <form method="POST" action="{{ route('registration.parents.store') }}" class="card p-6 sm:p-8" data-draft="orang-tua">
         @csrf
+
+        <x-draft-note />
 
         <h2 class="text-lg font-bold text-slate-900">Data Orang Tua / Wali</h2>
         <p class="mt-1 text-sm text-slate-600">

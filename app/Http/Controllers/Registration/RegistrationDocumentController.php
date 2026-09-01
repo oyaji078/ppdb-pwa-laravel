@@ -10,6 +10,7 @@ use App\Services\DocumentService;
 use App\Services\RegistrationService;
 use App\Support\ApplicantSession;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -44,12 +45,20 @@ class RegistrationDocumentController extends Controller
         ]);
     }
 
-    public function store(Request $request, DocumentType $documentType): RedirectResponse
+    /**
+     * Takes one file. The page uploads several by calling this once per file
+     * rather than in a single combined request, because a serverless host
+     * rejects a body over 4.5 MB before PHP runs and a handful of scans would
+     * exceed that together while none does alone.
+     */
+    public function store(Request $request, DocumentType $documentType): RedirectResponse|JsonResponse
     {
         $draft = $this->currentDraft();
 
         if ($draft === null) {
-            return $this->noDraft();
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Sesi Anda telah berakhir. Muat ulang halaman.'], 409)
+                : $this->noDraft();
         }
 
         $this->assertTypeBelongsToTrack($draft, $documentType);
@@ -60,11 +69,23 @@ class RegistrationDocumentController extends Controller
         );
 
         // DocumentService performs the real extension/MIME/size checks.
-        $this->documents->store($draft, $documentType, $request->file('file'));
+        $document = $this->documents->store($draft, $documentType, $request->file('file'));
 
         $this->registrations->advanceStep($draft, 'berkas');
 
-        return back()->with('success', sprintf('%s berhasil diunggah.', $documentType->name));
+        $message = sprintf('%s berhasil diunggah.', $documentType->name);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'document' => [
+                    'name' => $document->original_name,
+                    'size' => $document->humanFileSize(),
+                ],
+            ]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(RegistrationDocument $document): RedirectResponse

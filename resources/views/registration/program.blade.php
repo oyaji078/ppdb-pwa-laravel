@@ -5,8 +5,10 @@
 @section('title', 'Pendaftaran - Program')
 
 @section('wizard')
-    <form method="POST" action="{{ route('registration.program.store') }}" class="card p-6 sm:p-8">
+    <form method="POST" action="{{ route('registration.program.store') }}" class="card p-6 sm:p-8" data-draft="program">
         @csrf
+
+        <x-draft-note />
 
         <h2 class="text-lg font-bold text-slate-900">Program / Peminatan</h2>
         <p class="mt-1 text-sm text-slate-600">Pilih satu program yang ingin Anda ikuti.</p>
