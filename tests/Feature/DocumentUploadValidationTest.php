@@ -165,4 +165,48 @@ class DocumentUploadValidationTest extends TestCase
             $disk->assertExists($document->storage_path);
         }
     }
+
+    /**
+     * The upload page sends the files one at a time from a single button press
+     * and reads the outcome of each. Without a JSON answer it would have to
+     * parse a redirect, so this contract is what the page depends on.
+     */
+    public function test_an_upload_answers_with_json_when_the_page_asks_for_it(): void
+    {
+        $this->fakePrivateDisk();
+        $config = $this->createPpdbConfiguration();
+        $registration = $this->createAccountFor($config);
+
+        $response = $this->actingAsApplicant($registration->fresh())
+            ->postJson(route('registration.documents.store', $config['documentTypes']['kk']), [
+                'file' => UploadedFile::fake()->create('kartu-keluarga.pdf', 200, 'application/pdf'),
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('document.name', 'kartu-keluarga.pdf')
+            ->assertJsonStructure(['message', 'document' => ['name', 'size']]);
+
+        $this->assertDatabaseCount('registration_documents', 1);
+    }
+
+    /**
+     * A rejected file has to come back as JSON too, and name the reason, or the
+     * page cannot tell the applicant which row to fix.
+     */
+    public function test_a_rejected_upload_answers_with_a_json_error(): void
+    {
+        $this->fakePrivateDisk();
+        $config = $this->createPpdbConfiguration();
+        $registration = $this->createAccountFor($config);
+
+        $this->actingAsApplicant($registration->fresh())
+            ->postJson(route('registration.documents.store', $config['documentTypes']['sertifikat']), [
+                // That type takes PDF only.
+                'file' => UploadedFile::fake()->image('prestasi.jpg'),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('file');
+
+        $this->assertDatabaseCount('registration_documents', 0);
+    }
 }
