@@ -89,6 +89,7 @@ Route::get('/offline', [PwaController::class, 'offline'])->name('pwa.offline');
 Route::get('/app-icon/{size}.png', [AppIconController::class, 'show'])
     ->whereNumber('size')
     ->name('pwa.icon');
+Route::get('/favicon.ico', [AppIconController::class, 'favicon'])->name('pwa.favicon');
 
 /*
 |--------------------------------------------------------------------------

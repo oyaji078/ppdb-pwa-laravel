@@ -38,6 +38,11 @@ class AppIconController extends Controller
 
     public function __construct(private readonly SettingsRepository $settings) {}
 
+    public function favicon(Request $request): Response
+    {
+        return $this->show($request, 32);
+    }
+
     public function show(Request $request, int $size): Response
     {
         abort_unless(in_array($size, self::SIZES, true), 404);

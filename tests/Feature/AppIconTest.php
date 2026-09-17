@@ -29,6 +29,19 @@ class AppIconTest extends TestCase
         }
     }
 
+    public function test_favicon_route_returns_a_real_icon(): void
+    {
+        $body = $this->get('/favicon.ico')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->getContent();
+
+        $dimensions = getimagesizefromstring($body);
+
+        $this->assertNotFalse($dimensions, 'favicon tidak boleh kosong');
+        $this->assertSame([32, 32], [$dimensions[0], $dimensions[1]]);
+    }
+
     /**
      * The size list is closed so that a caller cannot make the server rasterise
      * arbitrary dimensions on demand.
