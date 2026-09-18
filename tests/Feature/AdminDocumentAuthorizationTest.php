@@ -115,6 +115,35 @@ class AdminDocumentAuthorizationTest extends TestCase
         $this->assertSoftDeleted('registrations', ['id' => $registration->id]);
     }
 
+    public function test_a_super_admin_can_find_and_archive_an_unfinished_draft(): void
+    {
+        $this->fakePrivateDisk();
+        $config = $this->createPpdbConfiguration();
+        $draft = $this->createAccountFor($config, [
+            'full_name' => 'Pendaftar Draft Uji',
+            'nisn' => '0098765432',
+        ]);
+
+        $admin = $this->createAdmin(UserRole::SuperAdmin);
+
+        $this->actingAs($admin)
+            ->get(route('admin.registrations.index', ['q' => '0098765432']))
+            ->assertOk()
+            ->assertSee('Pendaftar Draft Uji')
+            ->assertSee('Belum dikirim');
+
+        $this->actingAs($admin)
+            ->get(route('admin.registrations.show', $draft))
+            ->assertOk()
+            ->assertDontSee('Bukti Pendaftaran');
+
+        $this->actingAs($admin)
+            ->delete(route('admin.registrations.destroy', $draft))
+            ->assertRedirect(route('admin.registrations.index'));
+
+        $this->assertSoftDeleted('registrations', ['id' => $draft->id]);
+    }
+
     private function submittedDocument(): RegistrationDocument
     {
         $this->fakePrivateDisk();

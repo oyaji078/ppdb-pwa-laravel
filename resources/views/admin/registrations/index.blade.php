@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Pendaftar')
-@section('subheading', 'Seluruh pendaftar yang sudah mengirimkan formulir.')
+@section('subheading', 'Seluruh akun pendaftar, termasuk formulir yang masih berupa draft.')
 
 @section('actions')
     <a href="{{ route('admin.reports.index', request()->query()) }}" class="btn-secondary btn-sm">
@@ -63,8 +63,12 @@
                                     <td>{{ $registration->admissionTrack->name }}</td>
                                     <td>{{ $registration->program?->name ?? '-' }}</td>
                                     <td class="whitespace-nowrap">
-                                        {{ $registration->submitted_at?->translatedFormat('d M Y') }}
-                                        <span class="block text-xs text-slate-500">{{ $registration->submitted_at?->format('H:i') }}</span>
+                                        @if ($registration->submitted_at)
+                                            {{ $registration->submitted_at->translatedFormat('d M Y') }}
+                                            <span class="block text-xs text-slate-500">{{ $registration->submitted_at->format('H:i') }}</span>
+                                        @else
+                                            <span class="text-slate-400">Belum dikirim</span>
+                                        @endif
                                     </td>
                                     <td>
                                         <x-badge :class="$registration->registration_status->badge()">

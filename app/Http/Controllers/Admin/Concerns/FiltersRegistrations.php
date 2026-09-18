@@ -25,7 +25,6 @@ trait FiltersRegistrations
 
         return Registration::query()
             ->with(['applicant.previousSchool', 'academicYear', 'wave', 'admissionTrack', 'program', 'selectionResult'])
-            ->submitted()
             ->when($request->filled('academic_year_id'),
                 fn (Builder $q) => $q->where('academic_year_id', $request->integer('academic_year_id')))
             ->when($request->filled('registration_wave_id'),

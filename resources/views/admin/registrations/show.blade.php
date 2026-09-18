@@ -9,10 +9,12 @@
         <x-icon name="arrow-left" class="h-4 w-4" />
         Kembali
     </a>
-    <a href="{{ route('admin.registrations.receipt', $registration) }}" class="btn-secondary btn-sm">
-        <x-icon name="download" class="h-4 w-4" />
-        Bukti Pendaftaran
-    </a>
+    @unless ($registration->isDraft())
+        <a href="{{ route('admin.registrations.receipt', $registration) }}" class="btn-secondary btn-sm">
+            <x-icon name="download" class="h-4 w-4" />
+            Bukti Pendaftaran
+        </a>
+    @endunless
     @can('verify', $registration)
         <a href="{{ route('admin.verification.show', $registration) }}" class="btn-primary btn-sm">
             <x-icon name="file-check" class="h-4 w-4" />
