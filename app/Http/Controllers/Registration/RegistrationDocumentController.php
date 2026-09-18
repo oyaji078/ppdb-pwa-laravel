@@ -13,8 +13,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Step 7 of the wizard: uploading the documents the chosen track requires.
@@ -108,7 +108,7 @@ class RegistrationDocumentController extends Controller
      * Inline preview of the visitor's own upload, streamed from private
      * storage. Ownership is checked against the session's draft.
      */
-    public function preview(RegistrationDocument $document): Response|RedirectResponse
+    public function preview(RegistrationDocument $document): StreamedResponse|RedirectResponse
     {
         $draft = $this->currentDraft();
 
@@ -118,15 +118,11 @@ class RegistrationDocumentController extends Controller
 
         abort_unless($document->registration_id === $draft->id, 403);
 
-        $path = $this->documents->absolutePath($document);
+        $response = $this->documents->response($document);
 
-        abort_if($path === null, 404, 'Berkas tidak ditemukan.');
+        abort_if($response === null, 404, 'Berkas tidak ditemukan.');
 
-        return response()->file($path, [
-            'Content-Type' => $document->mime_type,
-            'Content-Disposition' => 'inline; filename="'.addslashes($document->original_name).'"',
-            'Cache-Control' => 'no-store, private',
-        ]);
+        return $response;
     }
 
     /**

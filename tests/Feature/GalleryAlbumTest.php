@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Gallery;
+use App\Models\GalleryImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -132,5 +133,28 @@ class GalleryAlbumTest extends TestCase
             ->assertSessionHasErrors('images.0');
 
         $this->assertSame(0, Gallery::query()->count());
+    }
+
+    public function test_gallery_lightbox_serializes_image_urls_safely(): void
+    {
+        Storage::fake('public');
+
+        $gallery = Gallery::query()->create([
+            'title' => 'Album Publik',
+            'slug' => 'album-publik',
+            'is_published' => true,
+            'sort_order' => 0,
+        ]);
+
+        GalleryImage::query()->create([
+            'gallery_id' => $gallery->id,
+            'image_path' => "cms/gallery/foto'khusus.jpg",
+            'sort_order' => 1,
+        ]);
+
+        $html = $this->get(route('gallery.show', $gallery))->assertOk()->getContent();
+
+        $this->assertStringContainsString('foto\\u0027khusus.jpg', $html);
+        $this->assertStringNotContainsString("active = '/storage/cms/gallery/foto'khusus.jpg'", $html);
     }
 }

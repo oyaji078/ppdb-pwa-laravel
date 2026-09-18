@@ -18,7 +18,7 @@
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 @foreach ($gallery->images as $image)
                     <button type="button"
-                            @click="active = '{{ Storage::disk('public')->url($image->image_path) }}'"
+                            @click="active = {{ Js::from(Storage::disk('public')->url($image->image_path)) }}"
                             class="group relative overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
                         <img src="{{ Storage::disk('public')->url($image->image_path) }}"
                              alt="{{ $image->caption ?: 'Foto '.$gallery->title }}"

@@ -42,6 +42,19 @@ class AdminDocumentAuthorizationTest extends TestCase
             ->assertHeaderContains('Cache-Control', 'no-store');
     }
 
+    public function test_document_preview_streams_the_stored_file_contents(): void
+    {
+        $document = $this->submittedDocument();
+        Storage::disk(config('ppdb.storage.disk'))->put($document->storage_path, '%PDF-admin-preview');
+
+        $response = $this->actingAs($this->createAdmin())
+            ->get(route('admin.documents.preview', $document))
+            ->assertOk()
+            ->assertHeaderContains('Content-Disposition', 'inline');
+
+        $this->assertSame('%PDF-admin-preview', $response->streamedContent());
+    }
+
     public function test_uploaded_files_are_not_reachable_over_the_public_disk(): void
     {
         $document = $this->submittedDocument();

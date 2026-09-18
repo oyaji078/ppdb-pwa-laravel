@@ -7,6 +7,7 @@ use App\Models\DocumentType;
 use App\Services\RegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ApplicantDocumentAuthorizationTest extends TestCase
@@ -45,11 +46,14 @@ class ApplicantDocumentAuthorizationTest extends TestCase
         app(RegistrationService::class)->submit($registration, statementAgreed: true);
 
         $document = $registration->fresh()->documents()->firstOrFail();
+        Storage::disk(config('ppdb.storage.disk'))->put($document->storage_path, '%PDF-test-document');
 
-        $this->actingAsApplicant($registration->fresh())
+        $response = $this->actingAsApplicant($registration->fresh())
             ->get(route('applicant.documents.preview', $document))
             ->assertOk()
             ->assertHeaderContains('Content-Type', 'application/pdf');
+
+        $this->assertSame('%PDF-test-document', $response->streamedContent());
     }
 
     public function test_a_guest_cannot_open_any_document(): void

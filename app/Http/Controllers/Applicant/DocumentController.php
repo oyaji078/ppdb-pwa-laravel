@@ -10,9 +10,8 @@ use App\Support\ApplicantSession;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
@@ -63,32 +62,26 @@ class DocumentController extends Controller
         return back()->with('success', sprintf('%s berhasil diunggah ulang dan menunggu verifikasi.', $documentType->name));
     }
 
-    public function preview(RegistrationDocument $document): BinaryFileResponse
+    public function preview(RegistrationDocument $document): StreamedResponse
     {
         $this->assertOwnership($document);
 
-        $path = $this->documents->absolutePath($document);
+        $response = $this->documents->response($document);
 
-        abort_if($path === null, 404, 'Berkas tidak ditemukan.');
+        abort_if($response === null, 404, 'Berkas tidak ditemukan.');
 
-        return response()->file($path, [
-            'Content-Type' => $document->mime_type,
-            'Content-Disposition' => 'inline; filename="'.addslashes($document->original_name).'"',
-            'Cache-Control' => 'no-store, private',
-        ]);
+        return $response;
     }
 
-    public function download(RegistrationDocument $document): BinaryFileResponse|Response
+    public function download(RegistrationDocument $document): StreamedResponse
     {
         $this->assertOwnership($document);
 
-        $path = $this->documents->absolutePath($document);
+        $response = $this->documents->response($document, 'attachment');
 
-        abort_if($path === null, 404, 'Berkas tidak ditemukan.');
+        abort_if($response === null, 404, 'Berkas tidak ditemukan.');
 
-        return response()->download($path, $document->original_name, [
-            'Cache-Control' => 'no-store, private',
-        ]);
+        return $response;
     }
 
     /**

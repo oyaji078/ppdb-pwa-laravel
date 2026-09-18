@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Stores applicant uploads on the private disk and keeps the database row in
@@ -200,15 +201,28 @@ class DocumentService
     }
 
     /**
-     * Absolute path on disk, or null when the file is missing.
+     * Stream a private document through the authorized application route.
+     *
+     * Using the filesystem response keeps this compatible with both a local
+     * disk and object storage such as Vercel Blob, where no local path exists.
      */
-    public function absolutePath(RegistrationDocument $document): ?string
+    public function response(RegistrationDocument $document, string $disposition = 'inline'): ?StreamedResponse
     {
         $disk = $this->disk();
 
-        return $disk->exists($document->storage_path)
-            ? $disk->path($document->storage_path)
-            : null;
+        if (! $disk->exists($document->storage_path)) {
+            return null;
+        }
+
+        return $disk->response(
+            $document->storage_path,
+            $document->original_name,
+            [
+                'Content-Type' => $document->mime_type,
+                'Cache-Control' => 'no-store, private',
+            ],
+            $disposition,
+        );
     }
 
     public function exists(string $path): bool
