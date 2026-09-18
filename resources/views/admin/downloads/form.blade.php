@@ -46,7 +46,7 @@
                        accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
                        class="block w-full cursor-pointer rounded-lg text-sm text-slate-600 ring-1 ring-slate-300 ring-inset file:mr-3 file:cursor-pointer file:rounded-l-lg file:border-0 file:bg-slate-50 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-100">
                 <p class="mt-1 text-xs text-slate-500">
-                    PDF, DOC, DOCX, XLS, XLSX, atau ZIP. Maksimal 10 MB.
+                    PDF, DOC, DOCX, XLS, XLSX, atau ZIP. Maksimal 4 MB.
                     @if ($download->exists) Kosongkan bila tidak ingin mengganti berkas. @endif
                 </p>
 

@@ -75,12 +75,14 @@ class DownloadController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'file' => [$fileRequired ? 'required' : 'nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,zip', 'max:10240'],
+            // Keep the complete multipart request below Vercel's 4.5 MB body
+            // limit so Laravel can return a useful validation message.
+            'file' => [$fileRequired ? 'required' : 'nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,zip', 'max:4096'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
         ], [
             'file.required' => 'Berkas wajib diunggah.',
             'file.mimes' => 'Format berkas harus PDF, DOC, DOCX, XLS, XLSX, atau ZIP.',
-            'file.max' => 'Ukuran berkas maksimal 10 MB.',
+            'file.max' => 'Ukuran berkas maksimal 4 MB.',
         ]);
 
         unset($validated['file']);
