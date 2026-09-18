@@ -5,6 +5,7 @@ const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = '{{ route('pwa.offline', absolute: false) }}';
 
 const PRECACHE_URLS = @json($precache);
+const PRECACHE_REQUESTS = PRECACHE_URLS.map((url) => new Request(url, { credentials: 'omit' }));
 
 /**
  * Anything under these prefixes carries personal data and is never cached.
@@ -23,7 +24,10 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches
             .open(STATIC_CACHE)
-            .then((cache) => cache.addAll(PRECACHE_URLS).catch(() => undefined))
+            // Precache is background work, not a visitor navigation. Keeping it
+            // anonymous prevents parallel page requests from writing an older
+            // database session over a login that just completed.
+            .then((cache) => cache.addAll(PRECACHE_REQUESTS).catch(() => undefined))
             .then(() => self.skipWaiting()),
     );
 });

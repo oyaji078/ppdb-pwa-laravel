@@ -90,6 +90,8 @@ class PwaPublicRouteTest extends TestCase
             $this->assertStringStartsNotWith('/admin', $url);
             $this->assertStringStartsNotWith('/pendaftar', $url);
         }
+
+        $this->assertStringContainsString("new Request(url, { credentials: 'omit' })", $body);
     }
 
     public function test_the_offline_page_explains_the_situation(): void

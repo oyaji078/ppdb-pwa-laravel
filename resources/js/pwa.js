@@ -4,7 +4,7 @@
  * Registration is deliberately skipped on admin and applicant paths: those
  * pages carry personal data and must never end up in a cache.
  */
-const PRIVATE_PREFIXES = ['/admin', '/pendaftar'];
+const PRIVATE_PREFIXES = ['/admin', '/pendaftar', '/masuk'];
 
 const isPrivatePath = () => PRIVATE_PREFIXES.some((prefix) => window.location.pathname.startsWith(prefix));
 
